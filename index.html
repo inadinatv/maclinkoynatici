@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.4.12/hls.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mpegts.js@1.7.4/dist/mpegts.min.js"></script>
 
     <style>
         :root {
@@ -883,8 +884,12 @@
         };
 
         let hlsInstance = null;
+        let mpegtsInstance = null;
         let activeStreamUrl = null;
         let activeStreamName = null;
+        let originalStreamUrl = null;
+        let streamUrlVariants = [];
+        let currentVariantIndex = 0;
         let currentState = PlayerState.IDLE;
         let reconnectAttempts = 0;
         let reconnectTimer = null;
@@ -1028,6 +1033,78 @@
             if(lower.includes('.m3u?') || lower.endsWith('.m3u')) return true;
             return false;
         }
+        function isTsUrl(url){
+            if(!url) return false;
+            const lower = url.toLowerCase();
+            if(lower.includes('extension=ts')) return true;
+            if(lower.split('?')[0].toLowerCase().endsWith('.ts')) return true;
+            // php live with mac/stream pattern often is TS
+            if(lower.includes('live.php') && lower.includes('extension=')) return true;
+            return false;
+        }
+        function buildStreamVariants(originalUrl){
+            if(!originalUrl) return [];
+            const variants = [];
+            const trimmed = originalUrl.trim();
+            const hlsUrl = formatStreamUrl(trimmed);
+            const origIsHls = isHlsUrl(trimmed);
+            const hlsIsDifferent = hlsUrl !== trimmed;
+            const hlsIsHls = isHlsUrl(hlsUrl);
+            // Titan gibi TS -> HLS dönüşümü varsa önce HLS dene (web için en uyumlu)
+            if(hlsIsDifferent && hlsIsHls){
+                variants.push({ url: hlsUrl, type: 'hls', label: 'HLS (m3u8)' });
+                variants.push({ url: trimmed, type: origIsHls ? 'hls' : 'ts', label: origIsHls ? 'HLS' : 'TS (orijinal)' });
+            } else if(origIsHls){
+                variants.push({ url: trimmed, type: 'hls', label: 'HLS' });
+                // TS varyantı da ekle? eğer hls ise ts variantı olmayabilir
+            } else {
+                // TS veya bilinmeyen — önce HLS varyantı varsa onu ekle, yoksa direkt TS
+                if(hlsIsDifferent){
+                    variants.push({ url: hlsUrl, type: 'hls', label: 'HLS (dönüştürülmüş)' });
+                    variants.push({ url: trimmed, type: 'ts', label: 'TS (ham)' });
+                } else {
+                    //örn: .mp4 veya direkt ts parametresiz
+                    const isTs = isTsUrl(trimmed);
+                    variants.push({ url: trimmed, type: isTs ? 'ts' : 'hls', label: isTs ? 'TS' : 'HLS' });
+                    // TS ise ek olarak HLS denemesi yok, tek varyant
+                }
+            }
+            // Deduplicate aynı URL
+            const dedup = [];
+            const seen = new Set();
+            for(const v of variants){ if(!seen.has(v.url)){ dedup.push(v); seen.add(v.url);} }
+            // Mixed content: https sayfada http stream bloklanır. https varyantı ekle (Titan https'i destekliyorsa şans ver)
+            if(location && location.protocol==='https:' && trimmed.startsWith('http://')){
+                const httpsTry = trimmed.replace(/^http:\/\//,'https://');
+                const httpsHls = formatStreamUrl(httpsTry);
+                // https HLS ve https TS varyantlarını da ekle (sona, fallback olarak)
+                [httpsHls, httpsTry].forEach(u=>{
+                    if(!seen.has(u)){
+                        dedup.push({ url: u, type: isHlsUrl(u)?'hls':'ts', label: (isHlsUrl(u)?'HLS':'TS')+' (https)' });
+                        seen.add(u);
+                    }
+                });
+            }
+            // Titan özel: extension=ts içeren live.php için proxy'ye gerek olmadan her iki varyant da kalsın
+            pLog('[VARIANTS] built for', trimmed, dedup);
+            return dedup;
+        }
+        function hasNextVariant(){ return currentVariantIndex + 1 < streamUrlVariants.length; }
+        function tryNextVariant(reason){
+            if(!hasNextVariant()){
+                return false;
+            }
+            currentVariantIndex++;
+            const next = streamUrlVariants[currentVariantIndex];
+            pWarn('[FALLBACK] switching to variant', currentVariantIndex, next, 'reason', reason);
+            showLoading('Alternatif kaynak deneniyor...', next.label + ' • ' + next.url.slice(0,58));
+            showNotification('Alternatif yayın deneniyor ('+next.label+')','sync',2600);
+            reconnectAttempts = 0;
+            clearTimeout(reconnectTimer); reconnectTimer=null;
+            destroyHls(false);
+            setTimeout(()=> createAndStartForVariant(currentVariantIndex), 650);
+            return true;
+        }
         function formatStreamUrl(url){
             if(!url) return url;
             try{
@@ -1126,6 +1203,17 @@
                     hlsInstance.destroy();
                 }catch(e){ pWarn('hls destroy err', e); }
                 hlsInstance=null;
+            }
+            if(mpegtsInstance){
+                try{
+                    pLog('[MPEGTS] destroy');
+                    // mpegts.js api: pause, unload, detachMediaElement, destroy
+                    try{ mpegtsInstance.pause(); }catch(e){}
+                    try{ mpegtsInstance.unload(); }catch(e){}
+                    try{ mpegtsInstance.detachMediaElement(); }catch(e){}
+                    try{ mpegtsInstance.destroy(); }catch(e){}
+                }catch(e){ pWarn('mpegts destroy err', e); }
+                mpegtsInstance=null;
             }
             if(fullCleanup){
                 try{
@@ -1345,23 +1433,33 @@
         }
         function doReconnect(reason){
             if(!isPlayerOpen || !activeStreamUrl) return;
+            // Titan varyantı: ilk birkaç denemeden sonra sıradaki varyanta geç
+            // Eğer HLS varyantı manifest hatası nedeniyle tekrar ediyorsa, hemen TS'ye geç
+            if(hasNextVariant() && (reason==='network' || reason==='manifest' || reason==='stall') && reconnectAttempts>=1){
+                // 1 başarısız denemeden sonra TS ham'ı dene (Titan için en hızlı yol)
+                if(tryNextVariant('reconnect-'+reason)){
+                    return;
+                }
+            }
             reconnectAttempts++;
-            pLog('[RECONNECT] doReconnect', reason, 'attempt', reconnectAttempts);
+            pLog('[RECONNECT] doReconnect', reason, 'attempt', reconnectAttempts, 'variant', currentVariantIndex);
             if(hlsInstance){
                 try{
-                    // Strategy: first try startLoad (for network)
                     if(reason==='stall' || reason==='network' || reason==='fragment' || reason==='manifest'){
                         pLog('[RECONNECT] hls.startLoad()');
                         hlsInstance.startLoad();
-                        // also check if after 5s still stuck, recreate
                         clearTimeout(reconnectTimer);
                         reconnectTimer = setTimeout(()=>{
                             reconnectTimer=null;
                             if(currentState===PlayerState.RECONNECTING || currentState===PlayerState.BUFFERING){
-                                pLog('[RECONNECT] startLoad not enough, recreating');
-                                const url = activeStreamUrl;
-                                destroyHls(false);
-                                createAndStart(url, false);
+                                pLog('[RECONNECT] startLoad not enough, recreating/fallback');
+                                if(hasNextVariant()){
+                                    tryNextVariant('startLoad-fail');
+                                } else {
+                                    const url = activeStreamUrl;
+                                    destroyHls(false);
+                                    createAndStart(url, false);
+                                }
                             }
                         }, 5000);
                         return;
@@ -1374,38 +1472,63 @@
                             reconnectTimer = setTimeout(()=>{
                                 reconnectTimer=null;
                                 if(currentState===PlayerState.RECONNECTING){
-                                    const url = activeStreamUrl;
-                                    destroyHls(false);
-                                    createAndStart(url, false);
+                                    if(hasNextVariant() && reconnectAttempts>=2){
+                                        tryNextVariant('media-recover-fail');
+                                    } else {
+                                        const url = activeStreamUrl;
+                                        destroyHls(false);
+                                        createAndStart(url, false);
+                                    }
                                 }
                             }, 4000);
                             return;
-                        }catch(e){
-                            pWarn('recoverMediaError failed', e);
-                        }
+                        }catch(e){ pWarn('recoverMediaError failed', e); }
                     }
-                }catch(e){
-                    pWarn('doReconnect hls op failed', e);
+                }catch(e){ pWarn('doReconnect hls op failed', e); }
+                if(hasNextVariant() && reconnectAttempts>=2){
+                    tryNextVariant('hls-recreate');
+                    return;
                 }
-                // fallback recreate
                 const url = activeStreamUrl;
                 destroyHls(false);
                 createAndStart(url, false);
+            } else if(mpegtsInstance){
+                // mpegts.js için: önce reload, olmazsa varyant değiştir
+                pLog('[RECONNECT] mpegts reload');
+                try{ mpegtsInstance.unload(); }catch(e){}
+                try{ mpegtsInstance.load(); }catch(e){}
+                videoEl.play().catch(()=>{});
+                setTimeout(()=>{
+                    if(currentState===PlayerState.RECONNECTING || currentState===PlayerState.BUFFERING){
+                        if(hasNextVariant()){
+                            tryNextVariant('mpegts-stall');
+                        } else {
+                            // aynı TS'yi tekrar dene
+                            destroyHls(false);
+                            createAndStartForVariant(currentVariantIndex);
+                        }
+                    }
+                }, 4000);
             } else {
-                // native or no hls, try reload src
+                // native / TS ham
                 if(videoEl.src && activeStreamUrl){
-                    pLog('[RECONNECT] native reload');
+                    pLog('[RECONNECT] native reload', activeStreamUrl);
+                    // native'de de bir kez daha dene, sonra varyant geç
+                    if(hasNextVariant() && reconnectAttempts>1){
+                        tryNextVariant('native-retry');
+                        return;
+                    }
                     videoEl.load();
                     videoEl.play().catch(()=>{});
-                    // if fails, recreate hls path
                     setTimeout(()=>{
                         if(videoEl.readyState===0){
-                            destroyHls(false);
-                            createAndStart(activeStreamUrl, false);
+                            if(hasNextVariant()) tryNextVariant('native-fail');
+                            else { destroyHls(false); createAndStart(activeStreamUrl, false); }
                         }
                     }, 3000);
                 } else {
-                    createAndStart(activeStreamUrl, false);
+                    if(hasNextVariant()) tryNextVariant('no-src');
+                    else createAndStart(activeStreamUrl, false);
                 }
             }
         }
@@ -1417,34 +1540,129 @@
             clearTimeout(reconnectTimer); reconnectTimer=null;
         }
 
-        /* ---- HLS creation ---- */
-        function createAndStart(url, isInitial=true){
-            if(!isPlayerOpen) return;
-            // if already hls, destroy first (partial)
-            if(hlsInstance){
-                try{ hlsInstance.destroy(); }catch(e){}
-                hlsInstance=null;
+        /* ---- HLS / MPEG-TS creation — TITAN + TS uyumlu ---- */
+        function startMpegTs(url){
+            const lib = window.mpegts;
+            if(!lib || !lib.isSupported()){
+                pWarn('[MPEGTS] not supported, fallback to native');
+                return false;
             }
-            const finalUrl = formatStreamUrl(url);
-            activeStreamUrl = finalUrl; // store converted
-            pLog('[START] createAndStart', finalUrl, 'initial', isInitial);
+            // mpegts.js is for raw MPEG-TS progressive (extension=ts). Titan live.php TS akışı için ideal.
+            try{
+                pLog('[MPEGTS] createPlayer for', url);
+                // ensure previous destroyed
+                if(mpegtsInstance){
+                    try{ mpegtsInstance.destroy(); }catch(e){}
+                    mpegtsInstance=null;
+                }
+                // mpegts.js config — canlı için
+                const player = lib.createPlayer({
+                    type: 'mse', // 'mse' live is stable, fallback to 'mpegts' if needed
+                    isLive: true,
+                    url: url,
+                    enableWorker: true,
+                    enableStashBuffer: true,
+                    stashInitialSize: 128,
+                    autoCleanupSourceBuffer: true,
+                    liveBufferLatencyChasing: true,
+                    liveBufferLatencyMaxLatency: 3,
+                    liveBufferLatencyMinRemain: 0.8
+                });
+                // Alternate: some builds require type:'mpegts'
+                // If mse fails we fallback below via error event
+                mpegtsInstance = player;
+                window._mpegts = player;
+                player.attachMediaElement(videoEl);
+                player.load();
+                const playPromise = videoEl.play();
+                if(playPromise && playPromise.catch) playPromise.catch(err=>{
+                    pWarn('[MPEGTS][PLAY] blocked', err);
+                    if(err && err.name==='NotAllowedError') showAutoplayBlock();
+                });
+                player.on(lib.Events.ERROR, (type, detail)=>{
+                    pWarn('[MPEGTS][ERROR]', type, detail);
+                    // detay: NetworkError, MediaError
+                    if(!isPlayerOpen) return;
+                    // Try next variant if available, otherwise reconnect
+                    if(hasNextVariant()){
+                        tryNextVariant('mpegts-'+type);
+                    } else {
+                        setPlayerState(PlayerState.BUFFERING);
+                        scheduleReconnect('network');
+                    }
+                });
+                player.on(lib.Events.METADATA_ARRIVED, ()=>{ pLog('[MPEGTS] METADATA'); hideLoading(); });
+                player.on(lib.Events.MEDIA_INFO, (info)=>{ pLog('[MPEGTS] MEDIA_INFO', info); });
+                // mpegts.js doesn't emit MANIFEST_PARSED; use playing event for success
+                activeStreamUrl = url;
+                return true;
+            }catch(e){
+                pWarn('[MPEGTS] create failed', e);
+                return false;
+            }
+        }
+        function startNativeHls(url){
+            pLog('[NATIVE] using native HLS for', url);
+            videoEl.src = url;
+            activeStreamUrl = url;
+            videoEl.load();
+            const p = videoEl.play();
+            if(p && p.catch) p.catch(err=>{
+                pWarn('[NATIVE] autoplay blocked', err);
+                if(err && err.name==='NotAllowedError') showAutoplayBlock();
+                else if(hasNextVariant()){
+                    // native failed (e.g., TS not supported) → dene diğer varyant
+                    setTimeout(()=> tryNextVariant('native-playfail'), 800);
+                }
+            });
+            return true;
+        }
+        function createAndStartForVariant(idx){
+            if(!isPlayerOpen) return;
+            if(idx<0 || idx>=streamUrlVariants.length){
+                pWarn('[START] invalid variant idx', idx);
+                return;
+            }
+            const variant = streamUrlVariants[idx];
+            currentVariantIndex = idx;
+            const url = variant.url;
+            activeStreamUrl = url;
+            pLog('[START] createAndStartForVariant', idx, variant);
+            // temizlik: önceki instance'lar destroyHls(false) zaten çağrılmadıysa burada da
+            if(hlsInstance){ try{ hlsInstance.destroy(); }catch(e){} hlsInstance=null; }
+            if(mpegtsInstance){ try{ try{ mpegtsInstance.pause(); }catch(e){} try{ mpegtsInstance.unload(); }catch(e){} try{ mpegtsInstance.detachMediaElement(); }catch(e){} try{ mpegtsInstance.destroy(); }catch(e){} }catch(e){} mpegtsInstance=null; }
 
+            // TS tipi için öncelik: mpegts.js > native
+            if(variant.type === 'ts'){
+                // Titan canlı: önce mpegts.js dene, olmazsa native progressive
+                const ok = startMpegTs(url);
+                if(!ok){
+                    // mpegts desteklemiyorsa native dene
+                    videoEl.src = url;
+                    activeStreamUrl = url;
+                    videoEl.load();
+                    const pr = videoEl.play();
+                    if(pr && pr.catch) pr.catch(err=>{
+                        pWarn('[TS][NATIVE] play blocked', err);
+                        if(err && err.name==='NotAllowedError') showAutoplayBlock();
+                    });
+                }
+                // TS için HLS fallback yok, ama hata olursa variant fallback tetiklenecek (video error listener)
+                return;
+            }
+
+            // HLS tipi
             if(Hls.isSupported()){
                 const cfg = getHlsConfig();
                 pLog('[HLS] config', cfg);
                 hlsInstance = new Hls(cfg);
-                // keep reference for debug
                 window._hls = hlsInstance;
 
-                hlsInstance.on(Hls.Events.MEDIA_ATTACHED, ()=>{
-                    pLog('[HLS] MEDIA_ATTACHED');
-                });
+                hlsInstance.on(Hls.Events.MEDIA_ATTACHED, ()=>{ pLog('[HLS] MEDIA_ATTACHED'); });
                 hlsInstance.on(Hls.Events.MANIFEST_LOADING, ()=>{ pLog('[HLS] MANIFEST_LOADING'); });
                 hlsInstance.on(Hls.Events.MANIFEST_PARSED, (evt, data)=>{
                     pLog('[HLS] MANIFEST_PARSED', data);
                     hideError();
-                    // duration / levels info
-                    // try autoplay
                     const playPromise = videoEl.play();
                     if(playPromise && playPromise.catch){
                         playPromise.then(()=>{
@@ -1452,11 +1670,7 @@
                             hideAutoplayBlock();
                         }).catch(err=>{
                             pWarn('[PLAY] autoplay blocked', err);
-                            if(err && err.name==='NotAllowedError'){
-                                showAutoplayBlock();
-                            } else {
-                                // other error maybe show
-                            }
+                            if(err && err.name==='NotAllowedError') showAutoplayBlock();
                         });
                     }
                 });
@@ -1464,86 +1678,123 @@
                     pLog('[HLS] LEVEL_LOADED', data.details ? data.details.live : '');
                 });
                 hlsInstance.on(Hls.Events.FRAG_BUFFERED, ()=>{
-                    // progress will update via timer
-                    if(!hasReceivedCanPlay && videoEl.readyState>=3){
-                        hasReceivedCanPlay=true;
-                    }
+                    if(!hasReceivedCanPlay && videoEl.readyState>=3) hasReceivedCanPlay=true;
                 });
                 hlsInstance.on(Hls.Events.ERROR, (evt, data)=>{
                     pWarn('[HLS][ERROR]', data.type, data.details, data);
+                    // Titan HLS varyantı başarısız olursa (404/ manifest) → TS varyantına fallback
+                    const isManifestError = data.details && (
+                        data.details.includes('MANIFEST') ||
+                        data.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR ||
+                        data.details === Hls.ErrorDetails.LEVEL_LOAD_TIMEOUT
+                    );
+                    const isNetworkFatal = data.type === Hls.ErrorTypes.NETWORK_ERROR && data.fatal;
                     if(!data.fatal){
-                        // non-fatal handling
-                        // BUFFER_STALLED_ERROR, FRAG_LOAD_ERROR etc will be retried automatically per config, but we monitor
                         if(data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR){
                             setPlayerState(PlayerState.BUFFERING);
                             showLoading('Ara bellek dolduruluyor...','');
-                            // don't schedule reconnect immediately; HLS will try nudge
                             setTimeout(()=>{ if(currentState===PlayerState.BUFFERING) hideLoading(); }, 2500);
                         } else if(data.details === Hls.ErrorDetails.FRAG_LOAD_ERROR || data.details===Hls.ErrorDetails.FRAG_LOAD_TIMEOUT){
-                            // fragment fail, HLS will retry per fragLoadingMaxRetry, but if we see repeated, schedule
-                            // we let HLS retry; only if we see many consecutive, we go to reconnect
-                            // For now just log and show buffering
                             setPlayerState(PlayerState.BUFFERING);
                         }
-                        // reset hide timer?
                         return;
                     }
-                    // fatal
+                    // fatal — önce alternatif varyant dene (Titan için kritik!)
+                    if(isManifestError || isNetworkFatal){
+                        // HLS varyantı (m3u8) başarısız → varsa TS ham dene
+                        if(hasNextVariant()){
+                            pLog('[HLS] fatal but fallback available, trying next variant');
+                            // destroy current hls before fallback to avoid double instance
+                            try{ hlsInstance.destroy(); }catch(e){} hlsInstance=null;
+                            tryNextVariant('hls-'+data.details);
+                            return;
+                        }
+                    }
                     switch(data.type){
                         case Hls.ErrorTypes.NETWORK_ERROR:
-                            // data.response code maybe
-                            // If 404/410, still retry a few times then error
                             pLog('[HLS] fatal NETWORK_ERROR', data.details);
-                            // For manifest load error, we want exponential backoff
                             scheduleReconnect('network');
                             break;
                         case Hls.ErrorTypes.MEDIA_ERROR:
                             pLog('[HLS] fatal MEDIA_ERROR', data.details);
-                            // Try recoverMediaError if attempts low
                             if(reconnectAttempts < 2){
                                 try{
                                     pLog('[HLS] recoverMediaError()');
                                     hlsInstance.recoverMediaError();
                                     setPlayerState(PlayerState.RECONNECTING);
                                     showLoading('Medya hatası toparlanıyor...','');
-                                    // schedule fallback if not recovered
                                     clearTimeout(reconnectTimer);
                                     reconnectTimer=setTimeout(()=>{
                                         reconnectTimer=null;
                                         if(currentState===PlayerState.RECONNECTING) scheduleReconnect('media');
                                     }, 3500);
-                                }catch(e){
-                                    scheduleReconnect('media');
-                                }
-                            } else {
-                                scheduleReconnect('media');
-                            }
+                                }catch(e){ scheduleReconnect('media'); }
+                            } else { scheduleReconnect('media'); }
                             break;
                         default:
                             pLog('[HLS] fatal unknown', data);
-                            showError('Yayın oynatılamıyor','Beklenmeyen oynatıcı hatası oluştu.', true);
-                            destroyHls(false);
+                            // son varyantta hata → harici oynatıcı öner
+                            if(hasNextVariant()){
+                                tryNextVariant('hls-unknown');
+                            } else {
+                                showError('Yayın oynatılamıyor','Beklenmeyen oynatıcı hatası. Harici Wuffy/Just Player ile deneyin.', true);
+                                destroyHls(false);
+                            }
                             break;
                     }
                 });
 
-                hlsInstance.loadSource(finalUrl);
+                hlsInstance.loadSource(url);
                 hlsInstance.attachMedia(videoEl);
 
             } else if(isNativeHlsSupported()){
-                pLog('[NATIVE] using native HLS');
-                videoEl.src = finalUrl;
-                videoEl.load();
-                const p = videoEl.play();
-                if(p && p.catch) p.catch(err=>{
-                    pWarn('[NATIVE] autoplay blocked', err);
-                    if(err && err.name==='NotAllowedError') showAutoplayBlock();
-                });
-                // native error handling
-                // we have video error listener already
+                startNativeHls(url);
             } else {
                 showError('Tarayıcınız desteklemiyor','Cihazınız HLS yayınlarını desteklemiyor. Lütfen Wuffy veya Just Player ile deneyin.', false);
                 pWarn('No HLS support');
+            }
+        }
+        // Legacy wrapper — eski çağrılar için (url string) — uyumluluk korundu
+        function createAndStart(url, isInitial=true){
+            if(!isPlayerOpen) return;
+            // Eğer streamUrlVariants oluşturulmuş ve url bu varyantlardan biriyse, doğrudan o index'i kullan
+            // Aksi takdirde yeni varyantlar oluştur ve ilkini başlat (retry logic için)
+            if(streamUrlVariants.length && streamUrlVariants.some(v=> v.url===formatStreamUrl(url) || v.url===url)){
+                const idx = streamUrlVariants.findIndex(v=> v.url===formatStreamUrl(url) || v.url===url);
+                if(idx>=0){ createAndStartForVariant(idx); return; }
+            }
+            // Varsayılan: direkt url ile HLS/MPEGTS başlat (fallback path)
+            // Basit mod: tipine göre karar ver
+            if(isTsUrl(url) && window.mpegts && window.mpegts.isSupported()){
+                // TS url direkt — mpegts dene
+                streamUrlVariants = buildStreamVariants(url);
+                currentVariantIndex = streamUrlVariants.findIndex(v=> v.url===url);
+                if(currentVariantIndex<0) currentVariantIndex=0;
+                createAndStartForVariant(currentVariantIndex);
+                return;
+            }
+            // HLS path — eski davranış korunuyor
+            const finalUrl = formatStreamUrl(url);
+            activeStreamUrl = finalUrl;
+            pLog('[START][LEGACY] createAndStart', finalUrl, 'initial', isInitial);
+            if(Hls.isSupported()){
+                // inline HLS minimal (fallback için) — esas yol createAndStartForVariant
+                const cfg = getHlsConfig();
+                hlsInstance = new Hls(cfg);
+                window._hls = hlsInstance;
+                hlsInstance.on(Hls.Events.MANIFEST_PARSED, ()=>{ hideError(); videoEl.play().catch(e=>{ if(e && e.name==='NotAllowedError') showAutoplayBlock(); }); });
+                hlsInstance.on(Hls.Events.ERROR, (evt,data)=>{
+                    if(data.fatal){
+                        if(hasNextVariant()){ tryNextVariant('legacy-'+data.details); }
+                        else scheduleReconnect(data.type===Hls.ErrorTypes.NETWORK_ERROR?'network':'media');
+                    }
+                });
+                hlsInstance.loadSource(finalUrl);
+                hlsInstance.attachMedia(videoEl);
+            } else if(isNativeHlsSupported()){
+                startNativeHls(finalUrl);
+            } else {
+                showError('Tarayıcınız desteklemiyor','Cihazınız HLS yayınlarını desteklemiyor.', false);
             }
         }
 
@@ -1631,38 +1882,33 @@
             });
             videoEl.addEventListener('error', ()=>{
                 const err = videoEl.error;
-                pWarn('[VIDEO] error', err);
+                pWarn('[VIDEO] error', err, 'active', activeStreamUrl, 'variants', streamUrlVariants, 'idx', currentVariantIndex);
                 if(!isPlayerOpen) return;
-                // native path error
-                if(!hlsInstance){
-                    // try to give meaningful message
+                // Titan TS + HLS fallback: video error'da diğer varyantı dene
+                if(hasNextVariant()){
+                    pLog('[VIDEO] error → fallback to next variant');
+                    tryNextVariant('video-error-'+(err?err.code:'unknown'));
+                    return;
+                }
+                // mpegts instance varsa onun error'u zaten handle edildi; burada hls dışı native error
+                if(!hlsInstance && !mpegtsInstance){
                     let msg='Video yüklenemedi.';
                     if(err){
-                        if(err.code===2) msg='Ağ hatası — yayın kesildi.';
-                        if(err.code===3) msg='Kod çözme hatası — yayın formatı desteklenmiyor.';
-                        if(err.code===4) msg='Kaynak bulunamadı veya desteklenmiyor.';
+                        if(err.code===2) msg='Ağ hatası — yayın kesildi. Titan linki için harici oynatıcı da deneyebilirsiniz.';
+                        if(err.code===3) msg='Kod çözme hatası — yayın formatı bu tarayıcıda desteklenmiyor. Wuffy/Just Player deneyin.';
+                        if(err.code===4) msg='Kaynak bulunamadı veya desteklenmiyor (CORS kaynaklı olabilir).';
                     }
-                    // if we tried converted url, try fallback original?
-                    // But we already use converted; could try original once
-                    if(activeStreamUrl && window.currentUrl && activeStreamUrl!==window.currentUrl && reconnectAttempts===0){
-                        pLog('[VIDEO] native error, trying fallback original URL');
+                    // Son varyanttayız, external öner
+                    if(streamUrlVariants.length>1){
+                        msg += ' Alternatif kaynaklar da denendi.';
+                    }
+                    showError('Yayın oynatılamıyor', msg + ' Harici oynatıcı seçenekleri mevcut.', true);
+                } else if(hlsInstance || mpegtsInstance){
+                    // hls/mpegts error zaten HLS/MPEGTS eventlerinde handle edildi; burada ek olarak bir kez daha dene
+                    if(currentState!==PlayerState.RECONNECTING && currentState!==PlayerState.ERROR){
                         scheduleReconnect('network');
-                        // will recreate with fallback? Our doReconnect for native will reload same url, but we could swap to original
-                        // quick fallback: try original
-                        setTimeout(()=>{
-                            if(currentState===PlayerState.ERROR || currentState===PlayerState.RECONNECTING){
-                                activeStreamUrl = window.currentUrl;
-                                videoEl.src = activeStreamUrl;
-                                videoEl.load();
-                                videoEl.play().catch(()=>{});
-                            }
-                        }, 1200);
-                    } else {
-                        showError('Yayın oynatılamıyor', msg, true);
                     }
                 } else {
-                    // hls error already handled via Hls.Events.ERROR; this is extra
-                    // if fatal already scheduled, ignore
                     if(currentState!==PlayerState.RECONNECTING && currentState!==PlayerState.ERROR){
                         scheduleReconnect('network');
                     }
@@ -1829,13 +2075,18 @@
         });
         // drag handling for progress? keep simple
 
-        // retry
+        // retry — Titan TS/HLS varyantları sıfırdan dener
         retryBtn.addEventListener('click', ()=>{
             hideError();
             reconnectAttempts=0;
             showLoading('Yeniden bağlanılıyor...','');
             setPlayerState(PlayerState.CONNECTING);
-            if(activeStreamUrl){
+            if(originalStreamUrl){
+                streamUrlVariants = buildStreamVariants(originalStreamUrl);
+                currentVariantIndex = 0;
+                destroyHls(false);
+                createAndStartForVariant(0);
+            } else if(activeStreamUrl){
                 destroyHls(false);
                 createAndStart(activeStreamUrl, false);
             } else if(window.currentUrl){
@@ -1858,39 +2109,37 @@
             if(!url) return;
             isPlayerOpen = true;
             activeStreamName = name || 'Canlı Yayın';
+            originalStreamUrl = url;
             playerStreamTitle.textContent = activeStreamName;
-            // escape already handled? title is plain text
             playerContainer.classList.add('active');
             playerContainer.style.display='flex';
             document.body.style.overflow='hidden';
             // reset state
             hideError();
             hideAutoplayBlock();
-            showLoading('Bağlantı kuruluyor...', activeStreamName);
+            // Titan gibi TS linkler için HLS ve TS varyantlarını oluştur
+            streamUrlVariants = buildStreamVariants(url);
+            currentVariantIndex = 0;
+            const first = streamUrlVariants[0];
+            showLoading('Bağlantı kuruluyor...', activeStreamName + (first? ' ('+first.label+')':'' ));
             setPlayerState(PlayerState.CONNECTING);
             showControls();
-            // destroy previous
-            destroyHls(false); // keep container visible but cleanup hls
-            // set volume from previous or default
-            // ensure videoEl muted false? but autoplay may require muted? we try unmuted first
+            destroyHls(false);
             videoEl.muted = false;
             videoEl.volume = 1;
             updateVolumeUI();
-            // start stall & progress monitors
             startStallMonitor();
             startProgressMonitor();
-            // small delay to allow container paint then start
-            setTimeout(()=> createAndStart(url, true), 120);
-            // update pip button visibility
+            setTimeout(()=> createAndStartForVariant(0), 120);
             if(!document.pictureInPictureEnabled || !videoEl.requestPictureInPicture){
                 pipBtn.style.display='none';
             } else {
                 pipBtn.style.display='flex';
             }
-            // focus close button for TV
             setTimeout(()=> closePlayerBtn.focus(), 180);
-            // ensure controls auto-hide after delay
             scheduleHideControls();
+            // Debug log Titan URL için
+            pLog('[START] Titan/TS URL variants', streamUrlVariants);
         }
         function closePlayer(){
             isPlayerOpen=false;
@@ -1902,6 +2151,9 @@
             setPlayerState(PlayerState.DESTROYED);
             activeStreamUrl=null;
             activeStreamName=null;
+            originalStreamUrl=null;
+            streamUrlVariants=[];
+            currentVariantIndex=0;
             if(document.fullscreenElement) {
                 try{ document.exitFullscreen(); }catch(e){}
             }
@@ -2138,9 +2390,14 @@
         window._playerDebug = {
             get state(){ return currentState; },
             get hls(){ return hlsInstance; },
+            get mpegts(){ return mpegtsInstance; },
             get video(){ return videoEl; },
             get attempts(){ return reconnectAttempts; },
-            formatStreamUrl, isHlsUrl
+            get variants(){ return streamUrlVariants; },
+            get variantIdx(){ return currentVariantIndex; },
+            formatStreamUrl, isHlsUrl, buildStreamVariants,
+            // Titan test helper: window._playerDebug.testTitan()
+            testTitan: ()=> startPlayback('http://titanplus.xyz/play/live.php?mac=00:1A:79:98:9F:65&stream=913191&extension=ts','TITAN TEST — Galatasaray maçı'),
         };
     </script>
 </body>
