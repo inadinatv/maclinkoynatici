@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Filmler - INADINA TV (TV Kumanda Uyumlu)</title>
+    <title>INADINA TV — Canlı Kanallar (TV Kumanda Uyumlu)</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
@@ -150,6 +150,8 @@
 
         @media (max-width: 600px) {
             body.search-active-mode .app-logo { display: none; }
+            .main-cat-tab { padding: 6px 12px; font-size: 0.84rem; }
+            .main-cat-tab .cat-count { display: none; }
         }
 
         /* ===== DÜŞEYMEN menü ===== */
@@ -160,14 +162,24 @@
         .drop-item:hover { background: rgba(255,255,255,0.07); color: var(--primary); }
         .theme-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 
-        /* ===== KATEGORİ CHİPLERİ ===== */
-        .m3u-categories-container { position: fixed; top: 56px; left: 0; width: 100%; background: var(--surface); z-index: 999; padding: 10px 15px; overflow-x: auto; white-space: nowrap; border-bottom: 1px solid var(--card-border); scrollbar-width: thin; }
+        /* ===== ANA KATEGORİ SEKMELERİ (üst katman) ===== */
+        .main-cat-container { position: fixed; top: 56px; left: 0; width: 100%; background: var(--surface); z-index: 999; padding: 8px 15px; overflow-x: auto; white-space: nowrap; border-bottom: 1px solid var(--card-border); scrollbar-width: thin; }
+        .main-cat-scroll { display: flex; gap: 8px; }
+        .main-cat-tab { display:flex; align-items:center; gap:7px; background: transparent; border: 1px solid transparent; color: var(--text2); padding: 7px 15px; border-radius: 10px; font-size: 0.9rem; font-weight: 700; cursor: pointer; transition: 0.25s; flex-shrink:0; }
+        .main-cat-tab i { font-size: 0.95em; }
+        .main-cat-tab:hover { color: var(--text); background: var(--surface2); }
+        .main-cat-tab.active { background: var(--primary-gradient); color: #fff; box-shadow: 0 4px 14px rgba(0,0,0,0.25); }
+        .main-cat-tab .cat-count { font-size: 0.72em; opacity: 0.85; background: rgba(0,0,0,0.22); padding: 1px 7px; border-radius: 10px; }
+
+        /* ===== KATEGORİ CHİPLERİ (alt katman = gruplar) ===== */
+        .m3u-categories-container { position: fixed; top: 104px; left: 0; width: 100%; background: var(--surface); z-index: 998; padding: 9px 15px; overflow-x: auto; white-space: nowrap; border-bottom: 1px solid var(--card-border); scrollbar-width: thin; }
         .m3u-categories-scroll { display: flex; gap: 10px; }
         .m3u-category-chip { background: var(--surface2); border: 1px solid var(--card-border); color: var(--text); padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: 0.3s; flex-shrink:0; }
         .m3u-category-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .legal-tag { display:inline-block; font-size:0.62rem; font-weight:800; letter-spacing:0.4px; background:#1f8a4c; color:#fff; padding:2px 6px; border-radius:5px; vertical-align:middle; margin-left:6px; }
 
         /* ===== UYGULAMA KONTEYNERİ ===== */
-        .app-container { padding: 120px 14px 20px; max-width: 1100px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+        .app-container { padding: 168px 14px 20px; max-width: 1100px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
         .section-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; gap:10px; flex-wrap:wrap; }
         .category-title { font-size: 1.1rem; font-weight: 700; color: var(--text); border-left: 3px solid var(--primary); padding-left: 10px; }
         .item-count { font-size: 0.8em; color: var(--text2); }
@@ -466,6 +478,23 @@
         .live-btn.live .dot{ background:#fff; animation: livePulse 1.4s infinite; }
         .time-display { color: rgba(255,255,255,0.88); font-size:0.78rem; font-weight:600; letter-spacing:0.02em; text-shadow: 0 1px 4px rgba(0,0,0,0.6); white-space:nowrap; }
         .volume-wrap { display:flex; align-items:center; gap:6px; }
+        /* ===== AYARLAR MENÜSÜ (kalite / hız / ses) ===== */
+        .settings-wrap { position: relative; display:flex; align-items:center; }
+        .settings-menu {
+            position: absolute; bottom: calc(100% + 12px); right: 0; min-width: 210px; max-height: 60vh; overflow-y: auto;
+            background: rgba(18,15,30,0.97); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 12px; padding: 8px; z-index: 30; display: none; box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+        }
+        .settings-menu.show { display: block; }
+        .settings-section { padding: 4px 2px; }
+        .settings-section + .settings-section { border-top: 1px solid rgba(255,255,255,0.08); margin-top: 4px; padding-top: 8px; }
+        .settings-head { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: #9c93b8; padding: 2px 10px 6px; display:flex; align-items:center; gap:7px; }
+        .settings-list { display: flex; flex-direction: column; gap: 2px; }
+        .settings-item { display:flex; align-items:center; justify-content: space-between; gap:10px; background: none; border: none; color: #eee; padding: 8px 10px; border-radius: 8px; font-size: 0.85rem; font-weight:600; cursor: pointer; text-align: left; width: 100%; transition: 0.15s; }
+        .settings-item:hover, .settings-item:focus { background: rgba(255,255,255,0.1); }
+        .settings-item.active { color: var(--primary-light); }
+        .settings-item.active::after { content: '\f00c'; font-family: 'Font Awesome 6 Free'; font-weight: 900; font-size: 0.75rem; }
+        @media (max-width: 640px){ .settings-menu { min-width: 180px; } }
         .volume-bar {
             width: 90px; height:4px; -webkit-appearance:none; appearance:none; background: rgba(255,255,255,0.22); border-radius:999px; outline:none; cursor:pointer;
         }
@@ -516,13 +545,28 @@
         <div class="search-bar-area" id="searchBarArea">
             <button id="searchIconToggle" tabindex="0" class="search-icon-toggle"><i class="fas fa-search"></i></button>
             <div class="search-input-container" id="searchInputContainer">
-                <input type="search" tabindex="0" id="searchInput" placeholder="Film ara...">
+                <input type="search" tabindex="0" id="searchInput" placeholder="Kanal ara...">
                 <button id="clearSearchBtn" tabindex="0" class="clear-search-button" style="display:none;"><i class="fas fa-times"></i></button>
             </div>
         </div>
 
         <div class="top-bar-right">
             <a href="https://t.me/inadinatv" target="_blank" tabindex="0" class="ctrl-btn"><i class="fab fa-telegram-plane"></i></a>
+
+            <div class="dropdown-wrap">
+                <button class="ctrl-btn" tabindex="0" id="netBtn" title="Bağlantı Ayarları (Proxy / User-Agent)"><i class="fas fa-sliders-h"></i></button>
+                <div class="dropdown" id="netDropdown" style="min-width:260px;">
+                    <div style="padding:6px 10px 4px; font-size:0.72rem; font-weight:800; letter-spacing:0.4px; text-transform:uppercase; color:var(--text2);">Bağlantı Ayarları</div>
+                    <label style="display:flex; align-items:center; gap:8px; padding:8px 12px; font-size:0.82rem; font-weight:600; color:var(--text); cursor:pointer;">
+                        <input type="checkbox" id="globalProxyToggle"> Proxy'yi zorla (tüm yayınlar)
+                    </label>
+                    <div style="padding:6px 12px 4px; font-size:0.72rem; font-weight:700; color:var(--text2);">User-Agent</div>
+                    <select id="uaSelect" style="width:calc(100% - 24px); margin:0 12px 8px; padding:7px 8px; border-radius:8px; background:var(--surface2); color:var(--text); border:1px solid var(--card-border); font-size:0.8rem;"></select>
+                    <div style="padding:2px 12px 4px; font-size:0.72rem; font-weight:700; color:var(--text2);">Proxy URL</div>
+                    <input type="text" id="proxyInput" placeholder="https://.../proxy?url=" style="width:calc(100% - 24px); margin:0 12px 10px; padding:7px 8px; border-radius:8px; background:var(--surface2); color:var(--text); border:1px solid var(--card-border); font-size:0.78rem;">
+                    <div style="padding:0 12px 4px; font-size:0.68rem; color:var(--text2); line-height:1.4;">Özel User-Agent / proxy yalnızca kendi yetkili kaynaklarınız içindir.</div>
+                </div>
+            </div>
 
             <div class="dropdown-wrap">
                 <button class="ctrl-btn" tabindex="0" id="apkBtn" title="Uygulamaları İndir"><i class="fas fa-download"></i></button>
@@ -544,13 +588,17 @@
         </div>
     </div>
 
+    <div class="main-cat-container">
+        <div class="main-cat-scroll" id="mainCatScroll"></div>
+    </div>
+
     <div class="m3u-categories-container">
         <div class="m3u-categories-scroll" id="m3uCategoriesScroll"></div>
     </div>
 
     <div class="app-container" id="appContainer">
         <div class="section-bar">
-            <div class="category-title" id="mainCategoryTitle">Tüm Filmler <span class="item-count">(0)</span></div>
+            <div class="category-title" id="mainCategoryTitle">Tüm Kanallar <span class="item-count">(0)</span></div>
             <div class="layout-btns">
                 <button class="lt-btn active" tabindex="0" data-layout="auto">⊞</button>
                 <button class="lt-btn" tabindex="0" data-layout="2">▦</button>
@@ -560,7 +608,7 @@
         </div>
 
         <div class="card-grid layout-auto" id="channelsContainer">
-            <div class="loading-placeholder"><i class="fas fa-spinner fa-spin"></i> Film listesi yükleniyor...</div>
+            <div class="loading-placeholder"><i class="fas fa-spinner fa-spin"></i> Kanallar yükleniyor...</div>
         </div>
 
         <div id="loadMoreContainer" class="load-more-container">
@@ -651,6 +699,23 @@
                     <div class="volume-wrap">
                         <input type="range" id="volumeBar" tabindex="0" class="volume-bar" min="0" max="100" value="100" aria-label="Ses seviyesi">
                     </div>
+                    <div class="settings-wrap">
+                        <button id="settingsBtn" tabindex="0" class="ctrl-icon-btn" aria-label="Ayarlar" title="Kalite / Hız"><i class="fas fa-cog"></i></button>
+                        <div id="settingsMenu" class="settings-menu" role="menu" aria-label="Oynatıcı ayarları">
+                            <div class="settings-section">
+                                <div class="settings-head"><i class="fas fa-signal"></i> Kalite</div>
+                                <div id="qualityList" class="settings-list"></div>
+                            </div>
+                            <div class="settings-section">
+                                <div class="settings-head"><i class="fas fa-tachometer-alt"></i> Oynatma Hızı</div>
+                                <div id="speedList" class="settings-list"></div>
+                            </div>
+                            <div class="settings-section" id="audioSection" style="display:none;">
+                                <div class="settings-head"><i class="fas fa-headphones"></i> Ses / Dil</div>
+                                <div id="audioList" class="settings-list"></div>
+                            </div>
+                        </div>
+                    </div>
                     <button id="pipBtn" tabindex="0" class="ctrl-icon-btn" aria-label="Resim içinde resim" title="PIP"><i class="fas fa-external-link-alt"></i></button>
                     <button id="fullscreenBtn" tabindex="0" class="ctrl-icon-btn" aria-label="Tam ekran" title="Tam ekran"><i class="fas fa-expand"></i></button>
                 </div>
@@ -701,6 +766,65 @@
         function closeDropdowns() { document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('show')); }
         document.getElementById('themeBtn').addEventListener('click', e => { e.stopPropagation(); closeDropdowns(); document.getElementById('themeDropdown').classList.toggle('show'); });
         document.getElementById('apkBtn').addEventListener('click', e => { e.stopPropagation(); closeDropdowns(); document.getElementById('apkDropdown').classList.toggle('show'); });
+        document.getElementById('netBtn').addEventListener('click', e => { e.stopPropagation(); closeDropdowns(); document.getElementById('netDropdown').classList.toggle('show'); });
+        // Net dropdown içine tıklayınca kapanmasın
+        document.getElementById('netDropdown').addEventListener('click', e => e.stopPropagation());
+
+        /* ===== USER-AGENT / PROXY AYARLARI (global) ===== */
+        function buildUAPresets(presets, defaultUA) {
+            const sel = document.getElementById('uaSelect');
+            if (!sel) return;
+            sel.innerHTML = '';
+            const optDefault = document.createElement('option');
+            optDefault.value = '';
+            optDefault.textContent = 'Tarayıcı varsayılanı';
+            sel.appendChild(optDefault);
+            Object.keys(presets || {}).forEach(name => {
+                const o = document.createElement('option');
+                o.value = presets[name];
+                o.textContent = name;
+                sel.appendChild(o);
+            });
+            // Kaydedilmiş tercihi geri yükle
+            const savedUA = localStorage.getItem('inadina_ua') || defaultUA || '';
+            if (savedUA) {
+                let matched = false;
+                Array.from(sel.options).forEach(o => { if (o.value === savedUA) { sel.value = savedUA; matched = true; } });
+                if (!matched && savedUA) {
+                    const o = document.createElement('option');
+                    o.value = savedUA; o.textContent = 'Özel'; o.selected = true;
+                    sel.appendChild(o);
+                }
+            }
+        }
+        function getSelectedUserAgent() {
+            const sel = document.getElementById('uaSelect');
+            return sel ? sel.value : '';
+        }
+        (function initNetControls() {
+            const uaSel = document.getElementById('uaSelect');
+            const proxyInput = document.getElementById('proxyInput');
+            const proxyToggle = document.getElementById('globalProxyToggle');
+            if (uaSel) uaSel.addEventListener('change', () => {
+                localStorage.setItem('inadina_ua', uaSel.value);
+                showNotification('User-Agent güncellendi', 'sliders-h', 1500);
+            });
+            if (proxyInput) {
+                proxyInput.value = localStorage.getItem('inadina_proxy') || '';
+                proxyInput.addEventListener('change', () => {
+                    localStorage.setItem('inadina_proxy', proxyInput.value.trim());
+                    if (proxyInput.value.trim()) contentConfig.proxyUrl = proxyInput.value.trim();
+                    showNotification('Proxy URL kaydedildi', 'sliders-h', 1500);
+                });
+            }
+            if (proxyToggle) {
+                proxyToggle.checked = localStorage.getItem('inadina_force_proxy') === '1';
+                proxyToggle.addEventListener('change', () => {
+                    localStorage.setItem('inadina_force_proxy', proxyToggle.checked ? '1' : '0');
+                    showNotification(proxyToggle.checked ? 'Proxy tüm yayınlar için açık' : 'Proxy zorlaması kapalı', 'sliders-h', 1800);
+                });
+            }
+        })();
         document.addEventListener('click', closeDropdowns);
         document.querySelectorAll('[data-theme]').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -1173,8 +1297,9 @@
                 const cfg = getHlsConfig();
                 hlsInstance = new Hls(cfg);
                 window._hls = hlsInstance;
-                hlsInstance.loadSource(url);
+                hlsInstance.loadSource(PlayerNet.wrap(url));
                 hlsInstance.attachMedia(videoEl);
+                bindHlsQualityEvents(hlsInstance);
                 activeStreamUrl = url;
                 currentVariantIndex = variantIdx;
 
@@ -1213,7 +1338,7 @@
                     if (!isPlayerOpen) return;
                     // HLS overwrite etmiyor - mevcut strateji hatası yoksa fallback
                     if (hasNextVariant()) {
-                        pLog('[VIDEO] error'da diğer varyantı dene');
+                        pLog('[VIDEO] error olayinda diğer varyantı dene');
                         tryVariantOrFail(currentVariantIndex + 1);
                     } else if (currentState !== PlayerState.RECONNECTING && currentState !== PlayerState.ERROR) {
                         scheduleReconnect('native-error');
@@ -1242,8 +1367,60 @@
             }
         }
 
+        /* =========================================================
+           AĞ KATMANI — PROXY / USER-AGENT / REFERER YÖNETİMİ
+           Tarayıcılar fetch/XHR üzerinden User-Agent'i çoğu zaman
+           bloklar; bu yüzden özel UA/Referer gerektiren yasal
+           kaynaklar için istekler yapılandırılabilir bir proxy
+           üzerinden yönlendirilir. Proxy, iletilen ua/referer
+           parametrelerini gerçek isteğe uygular.
+           ========================================================= */
+        const PlayerNet = {
+            proxyEnabled: false,
+            proxyUrl: '',
+            userAgent: '',
+            referer: '',
+            origin: '',
+            // Bir stream URL'ini gerekirse proxy üzerinden geçir
+            wrap(url) {
+                if (!this.proxyEnabled || !this.proxyUrl || !url) return url;
+                // Zaten proxy'lenmişse tekrar sarma
+                if (url.indexOf(this.proxyUrl) === 0) return url;
+                let out = this.proxyUrl + (this.proxyUrl.includes('?') ? '&' : '?') + 'url=' + encodeURIComponent(url);
+                if (this.userAgent) out += '&ua=' + encodeURIComponent(this.userAgent);
+                if (this.referer) out += '&referer=' + encodeURIComponent(this.referer);
+                if (this.origin) out += '&origin=' + encodeURIComponent(this.origin);
+                return out;
+            },
+            // XHR/fetch isteklerine tarayıcının izin verdiği header'ları uygula
+            applyHeaders(xhr) {
+                try {
+                    if (this.userAgent) {
+                        // Bazı tarayıcılar User-Agent'i düşürür; proxy fallback için X-User-Agent de gönderilir
+                        try { xhr.setRequestHeader('User-Agent', this.userAgent); } catch(e) {}
+                        try { xhr.setRequestHeader('X-User-Agent', this.userAgent); } catch(e) {}
+                    }
+                    if (this.referer) {
+                        try { xhr.setRequestHeader('X-Referer', this.referer); } catch(e) {}
+                    }
+                } catch (e) { pWarn('applyHeaders hata', e); }
+            },
+            configure(opts) {
+                opts = opts || {};
+                this.userAgent = opts.userAgent || '';
+                this.referer = opts.referer || '';
+                this.origin = opts.origin || '';
+                this.proxyUrl = opts.proxyUrl || this.proxyUrl || '';
+                this.proxyEnabled = !!opts.useProxy && !!this.proxyUrl;
+                pLog('[NET] configure', { proxy: this.proxyEnabled, ua: this.userAgent ? this.userAgent.slice(0,30)+'…' : '(varsayılan)', referer: this.referer });
+            }
+        };
+
         function getHlsConfig() {
             return {
+                xhrSetup: function(xhr, url) {
+                    PlayerNet.applyHeaders(xhr);
+                },
                 enableWorker: true,
                 lowLatencyMode: false,
                 backBufferLength: 30,
@@ -1350,7 +1527,7 @@
         /* ===== NATIVE HLS ===== */
         function initNativeHls(url, variantIdx) {
             pLog('[NATIVE HLS] deneyecek:', url);
-            videoEl.src = url;
+            videoEl.src = PlayerNet.wrap(url);
             activeStreamUrl = url;
             currentVariantIndex = variantIdx;
             videoEl.load();
@@ -1382,7 +1559,7 @@
                 mpegtsInstance = mpegts.createPlayer({
                     type: 'mse',
                     isLive: true,
-                    url: url,
+                    url: PlayerNet.wrap(url),
                     enableWorker: true,
                     enableStashBuffer: true,
                     stashInitialSize: 128,
@@ -1435,7 +1612,7 @@
         /* ===== NATIVE MP4 ===== */
         function initNativeMp4(url, variantIdx) {
             pLog('[MP4] doğal oynatma:', url);
-            videoEl.src = url;
+            videoEl.src = PlayerNet.wrap(url);
             activeStreamUrl = url;
             currentVariantIndex = variantIdx;
             videoEl.load();
@@ -1459,7 +1636,7 @@
         /* ===== GENEL NATIVE (varsayılan) ===== */
         function initNativeAny(url, variantIdx) {
             pLog('[NATIVE] genel deneyecek:', url);
-            videoEl.src = url;
+            videoEl.src = PlayerNet.wrap(url);
             activeStreamUrl = url;
             currentVariantIndex = variantIdx;
             videoEl.load();
@@ -1499,6 +1676,118 @@
                 });
             }
         }
+
+        /* =========================================================
+           KALİTE / HIZ / SES AYARLARI MENÜSÜ
+           ========================================================= */
+        const settingsBtn = document.getElementById('settingsBtn');
+        const settingsMenu = document.getElementById('settingsMenu');
+        const qualityList = document.getElementById('qualityList');
+        const speedList = document.getElementById('speedList');
+        const audioList = document.getElementById('audioList');
+        const audioSection = document.getElementById('audioSection');
+        const PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+        let currentPlaybackRate = 1;
+
+        function toggleSettingsMenu(force) {
+            const show = typeof force === 'boolean' ? force : !settingsMenu.classList.contains('show');
+            settingsMenu.classList.toggle('show', show);
+            if (show) { showControls(); clearTimeout(controlsHideTimer); }
+            else scheduleHideControls();
+        }
+        if (settingsBtn) {
+            settingsBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleSettingsMenu(); });
+        }
+        // Menü dışına tıklayınca kapat
+        document.addEventListener('click', (e) => {
+            if (settingsMenu.classList.contains('show') && !settingsMenu.contains(e.target) && e.target !== settingsBtn) {
+                toggleSettingsMenu(false);
+            }
+        });
+
+        function bindHlsQualityEvents(hls) {
+            try {
+                hls.on(Hls.Events.MANIFEST_PARSED, () => { renderQualityMenu(); renderAudioMenu(); });
+                hls.on(Hls.Events.LEVEL_SWITCHED, () => renderQualityMenu());
+                hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => renderAudioMenu());
+                hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, () => renderAudioMenu());
+            } catch (e) { pWarn('bindHlsQualityEvents', e); }
+        }
+
+        function renderQualityMenu() {
+            qualityList.textContent = '';
+            if (!hlsInstance || !hlsInstance.levels || hlsInstance.levels.length === 0) {
+                const none = document.createElement('div');
+                none.className = 'settings-item';
+                none.style.opacity = '0.6';
+                none.style.cursor = 'default';
+                none.textContent = 'Tek kalite';
+                qualityList.appendChild(none);
+                return;
+            }
+            const makeItem = (label, active, onClick) => {
+                const b = document.createElement('button');
+                b.className = 'settings-item' + (active ? ' active' : '');
+                b.tabIndex = 0;
+                b.textContent = label;
+                b.addEventListener('click', (e) => { e.stopPropagation(); onClick(); renderQualityMenu(); });
+                b.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); b.click(); }});
+                qualityList.appendChild(b);
+            };
+            const isAuto = hlsInstance.autoLevelEnabled;
+            makeItem('Otomatik', isAuto, () => { hlsInstance.currentLevel = -1; showNotification('Kalite: Otomatik', 'signal', 1500); });
+            // yüksekten düşüğe sırala
+            const levels = hlsInstance.levels
+                .map((lv, idx) => ({ lv, idx }))
+                .sort((a, b) => (b.lv.height || 0) - (a.lv.height || 0));
+            levels.forEach(({ lv, idx }) => {
+                const h = lv.height ? lv.height + 'p' : (lv.bitrate ? Math.round(lv.bitrate/1000) + ' kbps' : 'Seviye ' + idx);
+                const active = !isAuto && hlsInstance.currentLevel === idx;
+                makeItem(h, active, () => { hlsInstance.currentLevel = idx; showNotification('Kalite: ' + h, 'signal', 1500); });
+            });
+        }
+
+        function renderAudioMenu() {
+            if (!hlsInstance || !hlsInstance.audioTracks || hlsInstance.audioTracks.length <= 1) {
+                audioSection.style.display = 'none';
+                return;
+            }
+            audioSection.style.display = 'block';
+            audioList.textContent = '';
+            hlsInstance.audioTracks.forEach((tr, idx) => {
+                const b = document.createElement('button');
+                b.className = 'settings-item' + (hlsInstance.audioTrack === idx ? ' active' : '');
+                b.tabIndex = 0;
+                b.textContent = tr.name || tr.lang || ('Ses ' + (idx + 1));
+                b.addEventListener('click', (e) => { e.stopPropagation(); hlsInstance.audioTrack = idx; renderAudioMenu(); });
+                b.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); b.click(); }});
+                audioList.appendChild(b);
+            });
+        }
+
+        function renderSpeedMenu() {
+            speedList.textContent = '';
+            PLAYBACK_SPEEDS.forEach(sp => {
+                const b = document.createElement('button');
+                b.className = 'settings-item' + (currentPlaybackRate === sp ? ' active' : '');
+                b.tabIndex = 0;
+                b.textContent = sp === 1 ? 'Normal (1x)' : sp + 'x';
+                b.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    currentPlaybackRate = sp;
+                    try { videoEl.playbackRate = sp; } catch (err) {}
+                    showNotification('Hız: ' + (sp === 1 ? 'Normal' : sp + 'x'), 'tachometer-alt', 1500);
+                    renderSpeedMenu();
+                });
+                b.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); b.click(); }});
+                speedList.appendChild(b);
+            });
+        }
+        renderSpeedMenu();
+        // Yeni yayında hız korunur ama menü sıfırlanmasın diye playbackRate uygula
+        videoEl.addEventListener('loadedmetadata', () => {
+            try { videoEl.playbackRate = currentPlaybackRate; } catch (e) {}
+        });
 
         /* ===== HAZIRLIK TEKRAR ===== */
         function hasNextVariant() {
@@ -2165,6 +2454,8 @@
             setPlayerState(PlayerState.CONNECTING);
             showControls();
             destroyHls(false);
+            if (settingsMenu) settingsMenu.classList.remove('show');
+            if (typeof renderQualityMenu === 'function') { renderQualityMenu(); renderAudioMenu(); }
             videoEl.muted = false;
             videoEl.volume = 1;
             updateVolumeUI();
@@ -2183,6 +2474,7 @@
 
         function closePlayer() {
             isPlayerOpen = false;
+            if (settingsMenu) settingsMenu.classList.remove('show');
             playerContainer.classList.remove('active');
             playerContainer.style.display = 'none';
             document.body.style.overflow = '';
@@ -2238,6 +2530,18 @@
             const finalName = window.currentName || 'Canlı Yayın';
             const finalUrl = window.currentUrl;
             if (!finalUrl) { showNotification('Yayın URL bulunamadı', 'exclamation-triangle', 3000); return; }
+            // Kanalın proxy/User-Agent ayarlarını uygula
+            const ch = window.currentChannel || {};
+            const settings = (appData && appData.settings) || {};
+            const forceProxy = localStorage.getItem('inadina_force_proxy') === '1';
+            const userProxy = (localStorage.getItem('inadina_proxy') || '').trim();
+            PlayerNet.configure({
+                useProxy: forceProxy || !!ch.useProxy,
+                proxyUrl: ch.proxyUrl || userProxy || contentConfig.proxyUrl,
+                userAgent: ch.userAgent || getSelectedUserAgent() || settings.defaultUserAgent || '',
+                referer: ch.referer || '',
+                origin: ch.origin || ''
+            });
             showNotification(finalName + " oynatılıyor", "play", 2000);
             openPlayer(finalUrl, finalName);
         });
@@ -2390,99 +2694,216 @@
             }
         });
 
-        /* ===== M3U SİSTEMİ ===== */
-        const m3uConfig = {
-            proxyUrl: "https://script.google.com/macros/s/AKfycbzv4yjrPMkMTcZsnMA8dpi9b5mn0ju9OLhtmyR-Xau3k3lhEtfHhWXzCRqz9bxdVB4sUQ/dev",
-            m3uFileUrl: "https://file.garden/aMCMLdwOhlHjDvvq/Belgesel%20(1).m3u"
+        /* =========================================================
+           İÇERİK SİSTEMİ — JSON ODAKLI, İKİ KATMANLI KATEGORİ
+           channels.json:
+             - mainCategories: üst sekmeler (Spor, Haber, Ulusal...)
+             - channels: her biri mainCategory + group (alt kategori)
+             - settings.m3uSources: harici M3U listeleri (opsiyonel)
+             - settings: proxy / User-Agent yapılandırması
+           M3U kaynakları da JSON kanallarına birleştirilir.
+           ========================================================= */
+        const FALLBACK_LOGO = 'https://i.hizliresim.com/91rbev6.png';
+        const contentConfig = {
+            jsonUrl: 'channels.json',
+            proxyUrl: "https://script.google.com/macros/s/AKfycbzv4yjrPMkMTcZsnMA8dpi9b5mn0ju9OLhtmyR-Xau3k3lhEtfHhWXzCRqz9bxdVB4sUQ/dev"
         };
-        let allChannels = []; let displayedCount = 0; const loadLimit = 60; let currentList = [];
+        let appData = null;           // channels.json içeriği
+        let allChannels = [];         // birleştirilmiş tüm kanallar
+        let mainCategories = [];      // üst sekmeler
+        let activeMainCat = 'all';    // seçili üst kategori
+        let activeGroup = 'all';      // seçili alt kategori (grup)
+        let displayedCount = 0; const loadLimit = 60; let currentList = [];
 
-        async function initM3U() {
-            try {
-                // Kütüphane yüklenene kadar bekle (max 3 sn)
-                const waitLibs = new Promise((resolve) => {
+        function waitForLibs(maxMs) {
+            return new Promise((resolve) => {
+                if (isHlsJsAvailable() || isMpegtsJsAvailable() || isNativeHlsSupported()) return resolve();
+                const t = setTimeout(resolve, maxMs || 3000);
+                const iv = setInterval(() => {
                     if (isHlsJsAvailable() || isMpegtsJsAvailable() || isNativeHlsSupported()) {
-                        resolve();
-                    } else {
-                        const t = setTimeout(resolve, 3000);
-                        const checkInterval = setInterval(() => {
-                            if (isHlsJsAvailable() || isMpegtsJsAvailable() || isNativeHlsSupported()) {
-                                clearTimeout(t);
-                                clearInterval(checkInterval);
-                                resolve();
-                            }
-                        }, 200);
+                        clearTimeout(t); clearInterval(iv); resolve();
                     }
-                });
-                await waitLibs;
+                }, 200);
+            });
+        }
 
-                const res = await fetch(`${m3uConfig.proxyUrl}?url=${encodeURIComponent(m3uConfig.m3uFileUrl)}`);
-                if (!res.ok) throw new Error('Proxy HTTP ' + res.status);
-                const text = await res.text();
-                const lines = text.split('\n');
-                let currentItem = null;
-                const categories = new Set();
-
-                lines.forEach(line => {
-                    line = line.trim();
-                    if (line.startsWith('#EXTINF:')) {
-                        const titleMatch = line.match(/,([^,]+)$/);
-                        const logoMatch = line.match(/tvg-logo="([^"]+)"/);
-                        const groupMatch = line.match(/group-title="([^"]+)"/);
-                        currentItem = {
-                            title: (titleMatch ? titleMatch[1].trim() : 'İsimsiz Film'),
-                            image: (logoMatch ? logoMatch[1].trim() : 'https://i.hizliresim.com/91rbev6.png'),
-                            group: (groupMatch ? groupMatch[1].trim() : 'Genel')
-                        };
-                        categories.add(currentItem.group);
-                    } else if (line && !line.startsWith('#') && currentItem) {
-                        currentItem.url = line.trim();
-                        if (currentItem.url) allChannels.push(currentItem);
-                        currentItem = null;
-                    }
-                });
-
-                const chipBox = document.getElementById('m3uCategoriesScroll');
-                chipBox.textContent = '';
-                function createChip(cat, label) {
-                    const el = document.createElement('button');
-                    el.className = 'm3u-category-chip' + (cat === 'all' ? ' active' : '');
-                    el.tabIndex = 0;
-                    el.dataset.category = cat;
-                    el.textContent = label;
-                    el.addEventListener('click', function() {
-                        document.querySelectorAll('.m3u-category-chip').forEach(c => c.classList.remove('active'));
-                        this.classList.add('active');
-                        filterChannelsByCategory(this.dataset.category);
-                    });
-                    return el;
+        // Bir M3U metnini kanal nesnelerine ayrıştır
+        function parseM3U(text, source) {
+            const out = [];
+            const lines = text.split('\n');
+            let cur = null;
+            lines.forEach(raw => {
+                const line = raw.trim();
+                if (line.startsWith('#EXTINF:')) {
+                    const titleMatch = line.match(/,([^,]+)$/);
+                    const logoMatch = line.match(/tvg-logo="([^"]+)"/);
+                    const groupMatch = line.match(/group-title="([^"]+)"/);
+                    cur = {
+                        name: titleMatch ? titleMatch[1].trim() : 'İsimsiz',
+                        logo: logoMatch ? logoMatch[1].trim() : FALLBACK_LOGO,
+                        group: groupMatch ? groupMatch[1].trim() : 'Genel',
+                        mainCategory: (source && source.mainCategory) || 'belgesel',
+                        type: 'auto',
+                        legal: false,
+                        useProxy: source ? source.useProxy !== false : true
+                    };
+                } else if (line && !line.startsWith('#') && cur) {
+                    cur.url = line;
+                    if (cur.url) out.push(cur);
+                    cur = null;
                 }
-                chipBox.appendChild(createChip('all', 'Tüm Filmler'));
-                Array.from(categories).sort((a, b) => a.localeCompare(b, 'tr')).forEach(cat => {
-                    chipBox.appendChild(createChip(cat, cat));
-                });
+            });
+            return out;
+        }
 
-                filterChannelsByCategory('all');
+        // channels.json + M3U kaynaklarını yükle ve birleştir
+        async function initContent() {
+            const container = document.getElementById('channelsContainer');
+            try {
+                await waitForLibs(3000);
+
+                // 1) channels.json'u yükle
+                let data = null;
+                try {
+                    const jr = await fetch(contentConfig.jsonUrl, { cache: 'no-store' });
+                    if (jr.ok) data = await jr.json();
+                } catch (e) { pWarn('channels.json yüklenemedi', e); }
+                appData = data || { mainCategories: [], channels: [], settings: {} };
+                const settings = appData.settings || {};
+
+                // Proxy ve UA varsayılanlarını uygula
+                if (settings.defaultProxyUrl) contentConfig.proxyUrl = settings.defaultProxyUrl;
+                PlayerNet.proxyUrl = contentConfig.proxyUrl;
+                if (settings.defaultUserAgent) PlayerNet.userAgent = settings.defaultUserAgent;
+                buildUAPresets(settings.userAgentPresets || {}, settings.defaultUserAgent || '');
+
+                // 2) JSON kanallarını normalize et
+                const jsonChannels = (appData.channels || []).map(c => Object.assign({
+                    name: 'İsimsiz', logo: FALLBACK_LOGO, group: 'Genel',
+                    mainCategory: 'belgesel', type: 'auto', legal: false, useProxy: false
+                }, c));
+
+                // 3) M3U kaynaklarını çek ve ekle
+                const m3uSources = settings.m3uSources || [];
+                let m3uChannels = [];
+                for (const src of m3uSources) {
+                    try {
+                        const target = src.useProxy !== false
+                            ? `${contentConfig.proxyUrl}?url=${encodeURIComponent(src.url)}`
+                            : src.url;
+                        const res = await fetch(target);
+                        if (!res.ok) throw new Error('HTTP ' + res.status);
+                        const txt = await res.text();
+                        m3uChannels = m3uChannels.concat(parseM3U(txt, src));
+                    } catch (e) {
+                        pWarn('M3U kaynağı yüklenemedi: ' + src.url, e);
+                    }
+                }
+
+                allChannels = jsonChannels.concat(m3uChannels);
+
+                if (allChannels.length === 0) {
+                    container.innerHTML = `<div class="loading-placeholder"><i class="fas fa-exclamation-triangle"></i> Hiç kanal yüklenemedi. channels.json veya internet bağlantınızı kontrol edin.</div>`;
+                    return;
+                }
+
+                // 4) Üst kategorileri oluştur (JSON'da tanımlı olanlar + veride bulunanlar)
+                buildMainCategories();
+                renderMainCategories();
+                selectMainCategory('all');
             } catch (e) {
-                pWarn('M3U yükleme hatası', e);
-                document.getElementById('channelsContainer').innerHTML = `<div class="loading-placeholder"><i class="fas fa-exclamation-triangle"></i> Veri yüklenemedi. İnternet bağlantınızı kontrol edin.</div>`;
+                pErr('İçerik yükleme hatası', e);
+                container.innerHTML = `<div class="loading-placeholder"><i class="fas fa-exclamation-triangle"></i> Veri yüklenemedi. İnternet bağlantınızı kontrol edin.</div>`;
             }
         }
 
-        function filterChannelsByCategory(cat) {
-            const term = searchInput.value.trim().toLowerCase();
-            currentList = allChannels.filter(c => {
-                const matchCat = cat === 'all' || c.group === cat;
-                const matchTerm = !term || (c.title + ' ' + c.group).toLowerCase().includes(term);
-                return matchCat && matchTerm;
+        function buildMainCategories() {
+            const defined = (appData.mainCategories || []);
+            const present = new Set(allChannels.map(c => c.mainCategory || 'diger'));
+            // tanımlı sırayı koru, sadece içerikte var olanları göster
+            const list = defined.filter(mc => present.has(mc.id));
+            // tanımsız ama veride olan kategorileri de ekle
+            present.forEach(id => {
+                if (!list.some(mc => mc.id === id)) list.push({ id, label: id, icon: 'folder' });
             });
+            mainCategories = list;
+        }
+
+        function channelsInMain(mainId) {
+            return mainId === 'all' ? allChannels : allChannels.filter(c => (c.mainCategory || 'diger') === mainId);
+        }
+
+        function renderMainCategories() {
+            const box = document.getElementById('mainCatScroll');
+            box.textContent = '';
+            const makeTab = (id, label, icon, count) => {
+                const el = document.createElement('button');
+                el.className = 'main-cat-tab' + (id === activeMainCat ? ' active' : '');
+                el.tabIndex = 0;
+                el.dataset.main = id;
+                el.innerHTML = `<i class="fas fa-${escapeAttr(icon)}"></i> <span>${escapeHtml(label)}</span> <span class="cat-count">${count}</span>`;
+                el.addEventListener('click', () => selectMainCategory(id));
+                el.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); el.click(); } });
+                box.appendChild(el);
+            };
+            makeTab('all', 'Tümü', 'th-large', allChannels.length);
+            mainCategories.forEach(mc => makeTab(mc.id, mc.label, mc.icon || 'folder', channelsInMain(mc.id).length));
+        }
+
+        function selectMainCategory(mainId) {
+            activeMainCat = mainId;
+            activeGroup = 'all';
+            document.querySelectorAll('.main-cat-tab').forEach(t => t.classList.toggle('active', t.dataset.main === mainId));
+            renderGroupChips();
+            filterChannels();
+        }
+
+        function renderGroupChips() {
+            const chipBox = document.getElementById('m3uCategoriesScroll');
+            chipBox.textContent = '';
+            const scoped = channelsInMain(activeMainCat);
+            const groups = Array.from(new Set(scoped.map(c => c.group || 'Genel')))
+                .sort((a, b) => a.localeCompare(b, 'tr'));
+
+            const makeChip = (val, label) => {
+                const el = document.createElement('button');
+                el.className = 'm3u-category-chip' + (val === activeGroup ? ' active' : '');
+                el.tabIndex = 0;
+                el.dataset.group = val;
+                el.textContent = label;
+                el.addEventListener('click', function () {
+                    activeGroup = this.dataset.group;
+                    document.querySelectorAll('.m3u-category-chip').forEach(c => c.classList.remove('active'));
+                    this.classList.add('active');
+                    filterChannels();
+                });
+                el.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); el.click(); } });
+                chipBox.appendChild(el);
+            };
+            makeChip('all', 'Tümü');
+            groups.forEach(g => makeChip(g, g));
+        }
+
+        function filterChannels() {
+            const term = (searchInput.value || '').trim().toLowerCase();
+            currentList = allChannels.filter(c => {
+                const matchMain = activeMainCat === 'all' || (c.mainCategory || 'diger') === activeMainCat;
+                const matchGroup = activeGroup === 'all' || (c.group || 'Genel') === activeGroup;
+                const matchTerm = !term || ((c.name || '') + ' ' + (c.group || '')).toLowerCase().includes(term);
+                return matchMain && matchGroup && matchTerm;
+            });
+
+            const mcLabel = activeMainCat === 'all'
+                ? 'Tüm Kanallar'
+                : ((mainCategories.find(m => m.id === activeMainCat) || {}).label || activeMainCat);
+            const title = activeGroup === 'all' ? mcLabel : (mcLabel + ' • ' + activeGroup);
+
             const titleEl = document.getElementById('mainCategoryTitle');
             titleEl.textContent = '';
-            const txt = document.createTextNode((cat === 'all' ? 'Tüm Filmler' : cat) + ' ');
+            titleEl.appendChild(document.createTextNode(title + ' '));
             const countSpan = document.createElement('span');
             countSpan.className = 'item-count';
             countSpan.textContent = `(${currentList.length})`;
-            titleEl.appendChild(txt);
             titleEl.appendChild(countSpan);
 
             document.getElementById('channelsContainer').textContent = '';
@@ -2495,6 +2916,10 @@
             renderMore();
         }
 
+        // Geriye dönük uyumluluk (eski çağrılar için)
+        function filterChannelsByCategory() { filterChannels(); }
+        function initM3U() { return initContent(); }
+
         function renderMore() {
             const container = document.getElementById('channelsContainer');
             const placeholder = container.querySelector('.loading-placeholder');
@@ -2506,16 +2931,16 @@
                 card.className = 'cat-card';
                 card.tabIndex = 0;
                 card.setAttribute('role', 'button');
-                card.setAttribute('aria-label', item.title);
+                card.setAttribute('aria-label', item.name);
 
                 const imgWrap = document.createElement('div');
                 imgWrap.className = 'card-img-wrap';
                 const img = document.createElement('img');
                 img.className = 'card-img';
                 img.loading = 'lazy';
-                img.alt = item.title;
-                img.src = item.image;
-                img.onerror = function() { this.src = 'https://i.hizliresim.com/91rbev6.png'; };
+                img.alt = item.name;
+                img.src = item.logo || FALLBACK_LOGO;
+                img.onerror = function() { this.src = FALLBACK_LOGO; };
                 const badge = document.createElement('span');
                 badge.className = 'card-badge';
                 badge.textContent = 'CANLI';
@@ -2526,10 +2951,17 @@
                 body.className = 'card-body';
                 const nameEl = document.createElement('div');
                 nameEl.className = 'card-name';
-                nameEl.textContent = item.title;
+                nameEl.textContent = item.name;
                 const subEl = document.createElement('div');
                 subEl.className = 'card-sub';
-                subEl.textContent = item.group;
+                subEl.textContent = item.group || '';
+                if (item.legal) {
+                    const tag = document.createElement('span');
+                    tag.className = 'legal-tag';
+                    tag.textContent = 'RESMİ';
+                    subEl.appendChild(document.createTextNode(' '));
+                    subEl.appendChild(tag);
+                }
                 body.appendChild(nameEl);
                 body.appendChild(subEl);
 
@@ -2538,8 +2970,9 @@
 
                 card.addEventListener('click', () => {
                     window.currentUrl = item.url;
-                    window.currentName = item.title;
-                    document.getElementById('playerOptionsTitle').textContent = item.title;
+                    window.currentName = item.name;
+                    window.currentChannel = item;
+                    document.getElementById('playerOptionsTitle').textContent = item.name;
                     lastFocusedElement = card;
                     document.getElementById('playerOptionsModal').style.display = 'flex';
                     setTimeout(() => document.getElementById('playInBuiltInPlayer').focus(), 50);
@@ -2620,7 +3053,7 @@
             formatStreamUrl: streamDetector.formatHlsUrl,
             detectType: streamDetector.detectType,
             buildVariants: streamDetector.buildVariants,
-            testTitan: () => openPlayer('http://titanplus.xyz/play/live.php?mac=00:1A:79:98:9F:65&stream=913191&extension=ts', 'TITAN TEST — Galatasaray maçı'),
+            testTRT: () => openPlayer('https://tv-trtspor1.medya.trt.com.tr/master.m3u8', 'TRT Spor HD (resmi test)'),
         };
     </script>
 </body>

@@ -1,0 +1,115 @@
+{
+  "version": 3,
+  "updatedAt": "2026-09-09",
+  "settings": {
+    "//": "Player için genel yapılandırma. Proxy ve User-Agent burada yönetilir.",
+    "defaultProxyUrl": "https://script.google.com/macros/s/AKfycbzv4yjrPMkMTcZsnMA8dpi9b5mn0ju9OLhtmyR-Xau3k3lhEtfHhWXzCRqz9bxdVB4sUQ/dev",
+    "defaultUserAgent": "Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+    "userAgentPresets": {
+      "Chrome (Android)": "Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+      "Chrome (Windows)": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Safari (iPhone)": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+      "Smart TV (Tizen)": "Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/4.0 Chrome/76.0.3809.146 TV Safari/537.36",
+      "VLC": "VLC/3.0.18 LibVLC/3.0.18",
+      "ExoPlayer": "ExoPlayerLib/2.19.1 (Linux; Android 13) ExoPlayerDemo/1.0"
+    },
+    "m3uSources": [
+      {
+        "name": "Belgesel Arşivi",
+        "url": "https://file.garden/aMCMLdwOhlHjDvvq/Belgesel%20(1).m3u",
+        "useProxy": true,
+        "mainCategory": "Film & Belgesel"
+      }
+    ]
+  },
+  "mainCategories": [
+    { "id": "spor", "label": "Spor", "icon": "futbol" },
+    { "id": "haber", "label": "Haber", "icon": "newspaper" },
+    { "id": "ulusal", "label": "Ulusal", "icon": "tv" },
+    { "id": "cocuk", "label": "Çocuk", "icon": "child" },
+    { "id": "muzik", "label": "Müzik", "icon": "music" },
+    { "id": "belgesel", "label": "Belgesel & Film", "icon": "film" }
+  ],
+  "channels": [
+    {
+      "name": "TRT Spor HD",
+      "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/TRT_Spor_logo.svg/512px-TRT_Spor_logo.svg.png",
+      "url": "https://tv-trtspor1.medya.trt.com.tr/master.m3u8",
+      "type": "hls",
+      "mainCategory": "spor",
+      "group": "TRT Spor",
+      "legal": true,
+      "description": "Süper Lig, milli takım ve olimpik branşlar — resmi TRT yayını (şifresiz)."
+    },
+    {
+      "name": "TRT Spor Yıldız HD",
+      "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/TRT_Spor_logo.svg/512px-TRT_Spor_logo.svg.png",
+      "url": "https://tv-trtspor2.medya.trt.com.tr/master.m3u8",
+      "type": "hls",
+      "mainCategory": "spor",
+      "group": "TRT Spor",
+      "legal": true,
+      "description": "Amatör ve olimpik branşlar — resmi TRT yayını (şifresiz)."
+    },
+    {
+      "name": "TRT 1 HD",
+      "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/TRT_1_logo_%282021-%29.svg/512px-TRT_1_logo_%282021-%29.svg.png",
+      "url": "https://tv-trt1.medya.trt.com.tr/master.m3u8",
+      "type": "hls",
+      "mainCategory": "ulusal",
+      "group": "TRT",
+      "legal": true,
+      "description": "TRT'nin genel yayın kanalı — dizi, film ve maç yayınları."
+    },
+    {
+      "name": "TRT Haber HD",
+      "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/TRT_Haber_logo.svg/512px-TRT_Haber_logo.svg.png",
+      "url": "https://tv-trthaber.medya.trt.com.tr/master.m3u8",
+      "type": "hls",
+      "mainCategory": "haber",
+      "group": "TRT",
+      "legal": true,
+      "description": "7/24 canlı haber yayını — resmi TRT."
+    },
+    {
+      "name": "TRT Belgesel HD",
+      "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/TRT_Belgesel_logo_%282021%29.svg/512px-TRT_Belgesel_logo_%282021%29.svg.png",
+      "url": "https://tv-trtbelgesel.medya.trt.com.tr/master.m3u8",
+      "type": "hls",
+      "mainCategory": "belgesel",
+      "group": "TRT",
+      "legal": true,
+      "description": "Doğa, tarih ve bilim belgeselleri — resmi TRT."
+    },
+    {
+      "name": "TRT Çocuk HD",
+      "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/TRT_%C3%87ocuk_logo_%282021%29.svg/512px-TRT_%C3%87ocuk_logo_%282021%29.svg.png",
+      "url": "https://tv-trtcocuk.medya.trt.com.tr/master.m3u8",
+      "type": "hls",
+      "mainCategory": "cocuk",
+      "group": "TRT",
+      "legal": true,
+      "description": "Çizgi filmler ve çocuk programları — resmi TRT."
+    },
+    {
+      "name": "TRT Müzik HD",
+      "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/TRT_M%C3%BCzik_logo_%282021%29.svg/512px-TRT_M%C3%BCzik_logo_%282021%29.svg.png",
+      "url": "https://tv-trtmuzik.medya.trt.com.tr/master.m3u8",
+      "type": "hls",
+      "mainCategory": "muzik",
+      "group": "TRT",
+      "legal": true,
+      "description": "Türk ve dünya müziği — resmi TRT."
+    },
+    {
+      "name": "TRT Avaz HD",
+      "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/TRT_Avaz_logo_%282021%29.svg/512px-TRT_Avaz_logo_%282021%29.svg.png",
+      "url": "https://tv-trtavaz.medya.trt.com.tr/master.m3u8",
+      "type": "hls",
+      "mainCategory": "ulusal",
+      "group": "TRT",
+      "legal": true,
+      "description": "Balkanlar, Kafkaslar ve Orta Asya'ya yönelik yayın — resmi TRT."
+    }
+  ]
+}
