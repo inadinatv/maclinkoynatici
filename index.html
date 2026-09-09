@@ -6,10 +6,82 @@
     <title>Filmler - INADINA TV (TV Kumanda Uyumlu)</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.4.12/hls.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mpegts.js@1.7.4/dist/mpegts.min.js"></script>
+    <script>
+        // ===== KÜTÜPHANELERİN GÜVENLİ YÜKLENMESİ VE HATA YÖNETİMİ =====
+        (function initLibraries() {
+            // Kütüphane varlığını güvenli kontrol et
+            function checkLib(name, globalKey) {
+                try {
+                    return typeof window[globalKey] !== 'undefined' && window[globalKey] !== null;
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            // Kütüphane yükleme durumunu logla (debug mode)
+            const showNotification = function(msg, icon, duration) {
+                if (typeof showNotification === 'function') return;
+                // Önce load olmadan bildirim yok - sadece log
+                console.log('[LIB]', msg);
+            };
+
+            // Kütüphaneleri yükle (cascade fallback)
+            let hlsLoaded = checkLib('hls.js', 'Hls');
+            let mpegtsLoaded = checkLib('mpegts.js', 'mpegts');
+
+            if (!hlsLoaded) {
+                // CDN'den hls.js yükle
+                const hlsScript = document.createElement('script');
+                hlsScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.4.12/hls.min.js';
+                hlsScript.onload = function() {
+                    console.log('[LIB] hls.js yüklendi');
+                    window._hlsReady = true;
+                };
+                hlsScript.onerror = function() {
+                    console.error('[LIB] hls.js yüklenemedi - CDN sorunu');
+                    window._hlsFailed = true;
+                };
+                document.head.appendChild(hlsScript);
+            } else {
+                window._hlsReady = true;
+            }
+
+            if (!mpegtsLoaded) {
+                // CDN'den mpegts.js yükle
+                const mpegtsScript = document.createElement('script');
+                mpegtsScript.src = 'https://cdn.jsdelivr.net/npm/mpegts.js@1.7.4/dist/mpegts.min.js';
+                mpegtsScript.onload = function() {
+                    console.log('[LIB] mpegts.js yüklendi');
+                    window._mpegtsReady = true;
+                };
+                mpegtsScript.onerror = function() {
+                    console.error('[LIB] mpegts.js yüklenemedi - CDN sorunu');
+                    window._mpegtsFailed = true;
+                };
+                document.head.appendChild(mpegtsScript);
+            } else {
+                window._mpegtsReady = true;
+            }
+
+            // Polling: kütüphaneler yüklendiğinde işaretle
+            let pollCount = 0;
+            const pollInterval = setInterval(function() {
+                pollCount++;
+                if (checkLib('hls.js', 'Hls')) window._hlsReady = true;
+                if (checkLib('mpegts.js', 'mpegts')) window._mpegtsReady = true;
+                if (window._hlsReady && window._mpegtsReady && pollCount > 2) {
+                    clearInterval(pollInterval);
+                }
+                if (pollCount > 20) clearInterval(pollInterval); // 10 sn'de timeout
+            }, 500);
+
+            // Yükleme durumunu başlangıçta göster
+            console.log('[LIB] hlsReady:', window._hlsReady, 'mpegtsReady:', window._mpegtsReady);
+        })();
+    </script>
 
     <style>
+        /* ===== TEMA DEĞİŞKENLERİ ===== */
         :root {
             --hue: 345;
             --primary: hsl(var(--hue), 90%, 55%);
@@ -60,7 +132,7 @@
         .cat-card:focus { background: var(--surface2); }
         .player-option:focus { background: rgba(255,255,255,0.1); }
 
-        /* ===== TOP BAR ===== */
+        /* ===== ÜST ÇUBUK ===== */
         .top-bar { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; position: fixed; top: 0; left: 0; width: 100%; z-index: 1000; background: var(--surface); box-shadow: 0 4px 16px rgba(0,0,0,0.2); height: 56px; }
         .app-logo { font-size: 1.6rem; font-weight: 800; background: var(--primary-gradient); -webkit-background-clip: text; color: transparent; flex-shrink: 0; transition: 0.3s; }
 
@@ -80,7 +152,7 @@
             body.search-active-mode .app-logo { display: none; }
         }
 
-        /* ===== DROPDOWN ===== */
+        /* ===== DÜŞEYMEN menü ===== */
         .dropdown-wrap { position: relative; }
         .dropdown { position: absolute; top: calc(100% + 8px); right: 0; background: var(--surface); border: 1px solid var(--card-border); border-radius: var(--radius-md); padding: 8px; z-index: 1001; min-width: 200px; display: none; box-shadow: var(--card-shadow); }
         .dropdown.show { display: block; }
@@ -88,13 +160,13 @@
         .drop-item:hover { background: rgba(255,255,255,0.07); color: var(--primary); }
         .theme-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 
-        /* ===== KATEGORİ CHİPS ===== */
+        /* ===== KATEGORİ CHİPLERİ ===== */
         .m3u-categories-container { position: fixed; top: 56px; left: 0; width: 100%; background: var(--surface); z-index: 999; padding: 10px 15px; overflow-x: auto; white-space: nowrap; border-bottom: 1px solid var(--card-border); scrollbar-width: thin; }
         .m3u-categories-scroll { display: flex; gap: 10px; }
         .m3u-category-chip { background: var(--surface2); border: 1px solid var(--card-border); color: var(--text); padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: 0.3s; flex-shrink:0; }
         .m3u-category-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 
-        /* ===== APP CONTAINER ===== */
+        /* ===== UYGULAMA KONTEYNERİ ===== */
         .app-container { padding: 120px 14px 20px; max-width: 1100px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
         .section-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; gap:10px; flex-wrap:wrap; }
         .category-title { font-size: 1.1rem; font-weight: 700; color: var(--text); border-left: 3px solid var(--primary); padding-left: 10px; }
@@ -103,7 +175,7 @@
         .lt-btn { background: var(--surface2); border: 1px solid var(--card-border); border-radius: 6px; padding: 5px 10px; cursor: pointer; color: var(--text2); transition: 0.2s; }
         .lt-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 
-        /* ===== CARD GRID ===== */
+        /* ===== KART ızgara ===== */
         .card-grid { display: grid; gap: 10px; flex: 1; align-content: start; }
         .card-grid.layout-auto { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
         .card-grid.layout-2    { grid-template-columns: repeat(2, 1fr); }
@@ -128,7 +200,7 @@
         .load-more-button { padding: 10px 20px; font-weight: 600; background: var(--surface2); border: 1px solid var(--card-border); color: var(--text); border-radius: var(--radius-sm); cursor: pointer; transition: 0.3s; }
         .loading-placeholder { text-align: center; padding: 40px; color: var(--text2); }
 
-        /* ===== PLAYER OPTIONS MODAL ===== */
+        /* ===== OYNATMA SEÇENEKLERİ MODALI ===== */
         .player-options-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
         .player-options-container { background: var(--surface); border-radius: var(--radius-md); padding: 20px; width: 90%; max-width: 450px; border: 1px solid var(--card-border); box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
         .player-options-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid var(--card-border); padding-bottom: 10px; }
@@ -141,9 +213,7 @@
         .player-option-title { font-weight: 600; font-size: 0.9rem; }
         .player-option-desc { font-size: 0.75rem; color: var(--text2); }
 
-        /* =========================================================
-           PROFESYONEL IPTV PLAYER — YENİ TASARIM
-           ========================================================= */
+        /* ===== PROFESYONEL IPTV PLAYER ===== */
         .player-container {
             display: none;
             position: fixed;
@@ -167,7 +237,7 @@
             object-fit: contain;
             display: block;
         }
-        /* ---- top bar ---- */
+        /* ---- Üst çubuk ---- */
         .player-top-bar {
             position: absolute;
             top: 0; left: 0; right: 0;
@@ -227,7 +297,7 @@
         .close-video-btn:hover { background: rgba(255,30,60,0.92); border-color: rgba(255,255,255,0.3); transform: scale(1.06); }
         .close-video-btn:focus { box-shadow: 0 0 0 3px #fff, 0 0 14px var(--primary) !important; }
 
-        /* ---- center play button ---- */
+        /* ---- Merkez oynatma düğmesi ---- */
         .center-play-btn {
             position: absolute;
             top: 50%; left: 50%;
@@ -253,7 +323,7 @@
         .center-play-btn.buffering { pointer-events:none; }
         .center-play-btn.buffering i { animation: spin 1s linear infinite; display:inline-block; }
 
-        /* ---- loading / buffering overlay ---- */
+        /* ---- Yükleme / tamponlama üzerlenen bellek ---- */
         .player-loading {
             position: absolute;
             inset: 0;
@@ -285,7 +355,7 @@
         .loading-dots::after { content:''; animation: dots 1.4s infinite steps(4); }
         @keyframes dots { 0%{content:''} 25%{content:'.'} 50%{content:'..'} 75%{content:'...'} }
 
-        /* ---- error screen ---- */
+        /* ---- Hata ekranı ---- */
         .player-error {
             position: absolute;
             inset: 0;
@@ -313,7 +383,7 @@
         .retry-btn:hover { background: var(--primary-dark); transform: translateY(-1px); }
         .retry-btn:active { transform: scale(0.98); }
 
-        /* ---- autoplay blocked ---- */
+        /* ---- Otomatik oynatma engellendi ---- */
         .autoplay-overlay {
             position: absolute;
             inset: 0;
@@ -337,7 +407,7 @@
         .autoplay-overlay .big-play:hover{ transform: scale(1.06); background: var(--primary-dark); }
         .autoplay-overlay .msg{ color:#fff; font-weight:600; font-size:0.95rem; max-width:360px; }
 
-        /* ---- bottom controls ---- */
+        /* ---- Alt kontrolleri ---- */
         .player-controls {
             position: absolute;
             left:0; right:0; bottom:0;
@@ -414,14 +484,14 @@
             .live-badge-top{ font-size:0.6rem; padding:3px 6px; }
             .player-live-badge-inline{ display:none !important; }
         }
-        /* TV focus enlargements */
+        /* TV odak genişletmeleri */
         .player-controls .ctrl-icon-btn:focus,
         .player-top-bar .close-video-btn:focus,
         .center-play-btn:focus,
         .live-btn:focus,
         .retry-btn:focus { transform: scale(1.08); }
 
-        /* ===== NOTIFICATION ===== */
+        /* ===== Bildirim ===== */
         .notification { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%) translateY(120%); background: var(--surface); padding: 10px 16px; border-radius: var(--radius-md); box-shadow: var(--card-shadow); z-index: 9999; display: flex; align-items: center; gap: 9px; border: 1px solid var(--card-border); opacity: 0; transition: 0.3s; max-width:90vw; pointer-events:none; }
         .notification.show { opacity: 1; transform: translateX(-50%) translateY(0); }
         .notification i { color: var(--primary); flex-shrink:0; }
@@ -528,7 +598,7 @@
     <div id="playerContainer" class="player-container" aria-label="Canlı yayın oynatıcı">
         <video id="hlsVideoEl" tabindex="0" playsinline webkit-playsinline x5-playsinline preload="auto"></video>
 
-        <!-- Top bar -->
+        <!-- Üst çubuk -->
         <div id="playerTopBar" class="player-top-bar">
             <div class="player-title-wrap">
                 <span class="live-badge-top"><span class="dot"></span> CANLI</span>
@@ -538,17 +608,17 @@
             <button id="closePlayerBtn" tabindex="0" class="close-video-btn" aria-label="Yayını kapat"><i class="fas fa-times"></i></button>
         </div>
 
-        <!-- Center play/pause -->
+        <!-- Merkez oynatma/durdurma -->
         <button id="centerPlayBtn" tabindex="0" class="center-play-btn hidden" aria-label="Oynat / Durdur"><i class="fas fa-play"></i></button>
 
-        <!-- Loading -->
+        <!-- Yükleme -->
         <div id="playerLoading" class="player-loading hidden" role="status" aria-live="polite">
             <div class="spinner" aria-hidden="true"></div>
             <div class="loading-text" id="loadingText">Bağlantı kuruluyor...</div>
             <div class="loading-sub" id="loadingSub">Lütfen bekleyin</div>
         </div>
 
-        <!-- Error -->
+        <!-- Hata -->
         <div id="playerError" class="player-error" role="alert">
             <i class="fas fa-exclamation-triangle err-icon"></i>
             <div class="error-title" id="errorTitle">Yayın oynatılamıyor</div>
@@ -556,13 +626,13 @@
             <button id="retryBtn" tabindex="0" class="retry-btn"><i class="fas fa-redo"></i> Tekrar Dene</button>
         </div>
 
-        <!-- Autoplay blocked -->
+        <!-- Otomatik oynatma engellendi -->
         <div id="autoplayOverlay" class="autoplay-overlay">
             <button id="autoplayBtn" tabindex="0" class="big-play" aria-label="Yayını başlat"><i class="fas fa-play"></i></button>
             <div class="msg">Yayını başlatmak için OK / Oynat tuşuna basın</div>
         </div>
 
-        <!-- Bottom controls -->
+        <!-- Alt kontrol -->
         <div id="playerControls" class="player-controls">
             <div class="progress-wrap live-mode" id="progressWrap" role="slider" aria-label="Canlı ilerleme" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
                 <div class="progress-buffer" id="progressBuffer"></div>
@@ -600,16 +670,17 @@
         /* =========================================================
            YARDIMCI — GÜVENLİ HTML & LOG
            ========================================================= */
-        const PlayerDebug = false; // true yaparak detaylı log aç
+        const PlayerDebug = true; // true yaparak detaylı log aç
         function pLog(...args){ if(PlayerDebug) console.log('[PLAYER]', ...args); }
         function pWarn(...args){ if(PlayerDebug) console.warn('[PLAYER]', ...args); }
+        function pErr(...args){ if(PlayerDebug) console.error('[PLAYER]', ...args); }
         function escapeHtml(str){
             if(str==null) return '';
             return String(str)
                 .replace(/&/g,'&amp;')
                 .replace(/</g,'&lt;')
                 .replace(/>/g,'&gt;')
-                .replace(/"/g,'&quot;')
+                .replace(/\"/g,'&quot;')
                 .replace(/'/g,'&#39;');
         }
         function escapeAttr(str){ return escapeHtml(str).replace(/`/g,'&#96;'); }
@@ -626,7 +697,7 @@
             notifTimer = setTimeout(() => el.classList.remove('show'), duration);
         }
 
-        /* ===== DROPDOWN ===== */
+        /* ===== DÜŞEYMEN menü ===== */
         function closeDropdowns() { document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('show')); }
         document.getElementById('themeBtn').addEventListener('click', e => { e.stopPropagation(); closeDropdowns(); document.getElementById('themeDropdown').classList.toggle('show'); });
         document.getElementById('apkBtn').addEventListener('click', e => { e.stopPropagation(); closeDropdowns(); document.getElementById('apkDropdown').classList.toggle('show'); });
@@ -638,7 +709,7 @@
             });
         });
 
-        /* ===== LAYOUT ===== */
+        /* ===== DÜZEN LAYOUT ===== */
         document.querySelectorAll('[data-layout]').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.getElementById('channelsContainer').className = 'card-grid layout-' + btn.dataset.layout;
@@ -647,7 +718,7 @@
             });
         });
 
-        /* ===== ARAMA ===== */
+        /* ===== ARAŞTIRMA ===== */
         const searchInput = document.getElementById('searchInput');
         const searchBarArea = document.getElementById('searchBarArea');
         const searchIconToggle = document.getElementById('searchIconToggle');
@@ -677,233 +748,161 @@
             searchInput.focus();
         });
 
-        /* ===== M3U SİSTEMİ — KORUNDU, GÜVENLİ HALE GETİRİLDİ ===== */
-        const m3uConfig = {
-            proxyUrl: "https://script.google.com/macros/s/AKfycbzv4yjrPMkMTcZsnMA8dpi9b5mn0ju9OLhtmyR-Xau3k3lhEtfHhWXzCRqz9bxdVB4sUQ/dev",
-            m3uFileUrl: "https://file.garden/aMCMLdwOhlHjDvvq/Belgesel%20(1).m3u"
-        };
-        let allChannels = []; let displayedCount = 0; const loadLimit = 60; let currentList = [];
-
-        async function initM3U() {
-            try {
-                const res = await fetch(`${m3uConfig.proxyUrl}?url=${encodeURIComponent(m3uConfig.m3uFileUrl)}`);
-                if(!res.ok) throw new Error('Proxy HTTP '+res.status);
-                const text = await res.text();
-                const lines = text.split('\n');
-                let currentItem = null;
-                const categories = new Set();
-
-                lines.forEach(line => {
-                    line = line.trim();
-                    if (line.startsWith('#EXTINF:')) {
-                        const titleMatch = line.match(/,(.+)$/);
-                        const logoMatch = line.match(/tvg-logo="([^"]+)"/);
-                        const groupMatch = line.match(/group-title="([^"]+)"/);
-                        currentItem = {
-                            title: (titleMatch ? titleMatch[1].trim() : 'İsimsiz Film'),
-                            image: (logoMatch ? logoMatch[1].trim() : 'https://i.hizliresim.com/91rbev6.png'),
-                            group: (groupMatch ? groupMatch[1].trim() : 'Genel')
-                        };
-                        // kategori set'e güvenli ekle (escape değil, filtre için ham değer)
-                        categories.add(currentItem.group);
-                    } else if (line && !line.startsWith('#') && currentItem) {
-                        currentItem.url = line.trim();
-                        // güvenlik: URL boşsa ekleme
-                        if(currentItem.url) allChannels.push(currentItem);
-                        currentItem = null;
-                    }
-                });
-
-                const chipBox = document.getElementById('m3uCategoriesScroll');
-                chipBox.textContent = '';
-                function createChip(cat, label){
-                    const el = document.createElement('button');
-                    el.className = 'm3u-category-chip' + (cat==='all' ? ' active':'');
-                    el.tabIndex = 0;
-                    el.dataset.category = cat;
-                    el.textContent = label;
-                    el.addEventListener('click', function(){
-                        document.querySelectorAll('.m3u-category-chip').forEach(c => c.classList.remove('active'));
-                        this.classList.add('active');
-                        filterChannelsByCategory(this.dataset.category);
-                    });
-                    return el;
-                }
-                chipBox.appendChild(createChip('all','Tüm Filmler'));
-                Array.from(categories).sort((a,b)=> a.localeCompare(b,'tr')).forEach(cat => {
-                    chipBox.appendChild(createChip(cat, cat));
-                });
-
-                filterChannelsByCategory('all');
-            } catch(e) {
-                pWarn('M3U load error', e);
-                document.getElementById('channelsContainer').innerHTML = `<div class="loading-placeholder"><i class="fas fa-exclamation-triangle"></i> Veri yüklenemedi. İnternet bağlantınızı kontrol edin.</div>`;
-            }
-        }
-
-        function filterChannelsByCategory(cat) {
-            const term = searchInput.value.trim().toLowerCase();
-            currentList = allChannels.filter(c => {
-                const matchCat = cat === 'all' || c.group === cat;
-                const matchTerm = !term || (c.title + ' ' + c.group).toLowerCase().includes(term);
-                return matchCat && matchTerm;
-            });
-            const titleEl = document.getElementById('mainCategoryTitle');
-            // güvenli title gösterimi
-            titleEl.textContent = '';
-            const txt = document.createTextNode((cat === 'all' ? 'Tüm Filmler' : cat) + ' ');
-            const countSpan = document.createElement('span');
-            countSpan.className = 'item-count';
-            countSpan.textContent = `(${currentList.length})`;
-            titleEl.appendChild(txt);
-            titleEl.appendChild(countSpan);
-
-            document.getElementById('channelsContainer').textContent = '';
-            displayedCount = 0;
-            if(currentList.length===0){
-                document.getElementById('channelsContainer').innerHTML = `<div class="loading-placeholder"><i class="fas fa-search"></i> Sonuç bulunamadı.</div>`;
-                document.getElementById('loadMoreContainer').style.display='none';
-                return;
-            }
-            renderMore();
-        }
-
-        function renderMore() {
-            const container = document.getElementById('channelsContainer');
-            // placeholder temizle (ilk render'da olabilir)
-            const placeholder = container.querySelector('.loading-placeholder');
-            if(placeholder) placeholder.remove();
-
-            const toShow = currentList.slice(displayedCount, displayedCount + loadLimit);
-            toShow.forEach(item => {
-                const card = document.createElement('div');
-                card.className = 'cat-card';
-                card.tabIndex = 0;
-                card.setAttribute('role','button');
-                card.setAttribute('aria-label', item.title);
-
-                const imgWrap = document.createElement('div');
-                imgWrap.className = 'card-img-wrap';
-                const img = document.createElement('img');
-                img.className = 'card-img';
-                img.loading = 'lazy';
-                img.alt = item.title;
-                img.src = item.image;
-                img.onerror = function(){ this.src='https://i.hizliresim.com/91rbev6.png'; };
-                const badge = document.createElement('span');
-                badge.className='card-badge'; badge.textContent='CANLI';
-                imgWrap.appendChild(img); imgWrap.appendChild(badge);
-
-                const body = document.createElement('div');
-                body.className='card-body';
-                const nameEl = document.createElement('div');
-                nameEl.className='card-name'; nameEl.textContent = item.title;
-                const subEl = document.createElement('div');
-                subEl.className='card-sub'; subEl.textContent = item.group;
-                body.appendChild(nameEl); body.appendChild(subEl);
-
-                card.appendChild(imgWrap); card.appendChild(body);
-
-                card.addEventListener('click', () => {
-                    window.currentUrl = item.url;
-                    window.currentName = item.title;
-                    document.getElementById('playerOptionsTitle').textContent = item.title;
-                    lastFocusedElement = card;
-                    document.getElementById('playerOptionsModal').style.display = 'flex';
-                    setTimeout(() => document.getElementById('playInBuiltInPlayer').focus(), 50);
-                });
-                card.addEventListener('keydown', (e)=>{
-                    if(e.key==='Enter'){ e.preventDefault(); card.click(); }
-                });
-                container.appendChild(card);
-            });
-            displayedCount += toShow.length;
-            document.getElementById('loadMoreContainer').style.display = displayedCount < currentList.length ? 'block' : 'none';
-        }
-        document.getElementById('loadMoreBtn').addEventListener('click', renderMore);
-
-        /* ===== MODAL KAPAT ===== */
-        document.getElementById('playerOptionsClose').addEventListener('click', () => {
-            document.getElementById('playerOptionsModal').style.display = 'none';
-            if (lastFocusedElement) lastFocusedElement.focus();
-        });
-        document.getElementById('playerOptionsModal').addEventListener('click', (e)=>{
-            if(e.target===e.currentTarget){
-                e.currentTarget.style.display='none';
-                if(lastFocusedElement) lastFocusedElement.focus();
-            }
-        });
-
-        /* ===== DIŞ OYNATICI SEÇENEKLERİ — KORUNDU ===== */
-        document.getElementById('playWithExoplayer').addEventListener('click', () => {
-            let url = window.currentUrl;
-            if (!url.includes('.m3u8')) url += (url.includes('?') ? '&' : '?') + 'ext=.m3u8';
-            window.location.href = url;
-            document.getElementById('playerOptionsModal').style.display = 'none';
-            showNotification("ExoPlayer başlatılıyor...", "play-circle");
-        });
-        document.getElementById('playInWuffyPlayer').addEventListener('click', () => {
-            try{
-                const b64 = btoa(unescape(encodeURIComponent(window.currentUrl)));
-                window.location.href = `intent://${b64}#Intent;scheme=xmtv;package=co.wuffy.player;end`;
-            }catch(e){ window.location.href = `intent://${window.currentUrl}#Intent;scheme=http;package=co.wuffy.player;end`; }
-            document.getElementById('playerOptionsModal').style.display = 'none';
-            showNotification("Wuffy Player başlatılıyor...", "rocket");
-        });
-        document.getElementById('playInJustPlayer').addEventListener('click', () => {
-            const noHttp = window.currentUrl.replace(/^https?:\/\//, '');
-            window.location.href = `intent://${noHttp}#Intent;scheme=http;package=com.brouken.player;type=video/*;end`;
-            document.getElementById('playerOptionsModal').style.display = 'none';
-            showNotification("Just Player başlatılıyor...", "film");
-        });
-
         /* =========================================================
-           PROFESYONEL HLS PLAYER MANAGER
+           KÜTÜPHANE DURUMU KONTROLÜ
            ========================================================= */
+        function isHlsJsAvailable() {
+            try {
+                return typeof Hls !== 'undefined' && typeof Hls.isSupported === 'function' && Hls.isSupported();
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function isMpegtsJsAvailable() {
+            try {
+                return typeof mpegts !== 'undefined' && typeof mpegts.isSupported === 'function' && mpegts.isSupported();
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function isNativeHlsSupported() {
+            try {
+                const v = document.createElement('video');
+                return !!v.canPlayType && v.canPlayType('application/vnd.apple.mpegurl') !== '';
+            } catch (e) {
+                return false;
+            }
+        }
+
+        /* ===== YAYIN YAÇI YAKALAMA SINIFI ===== */
+        class StreamLinkDetector {
+            constructor() {
+                this.url = '';
+                this.name = '';
+            }
+            detectType(url) {
+                if (!url || typeof url !== 'string') return 'unknown';
+                const lower = url.toLowerCase().trim();
+                if (lower.includes('.m3u8') || lower.includes('extension=m3u8') || lower.includes('type=m3u8'))
+                    return 'hls';
+                if (lower.includes('.ts') || lower.includes('extension=ts') || (lower.includes('live.php') && lower.includes('extension=')))
+                    return 'ts';
+                if (lower.includes('.mp4')) return 'mp4';
+                if (lower.includes('.m3u')) return 'm3u-list';
+                return 'unknown';
+            }
+            formatHlsUrl(url) {
+                if (!url) return url;
+                try {
+                    const u = new URL(url, location.href);
+                    const ext = u.searchParams.get('extension');
+                    if (ext && ext.toLowerCase() === 'ts') {
+                        u.searchParams.set('extension', 'm3u8');
+                        return u.toString();
+                    }
+                    const path = u.pathname;
+                    if (path.toLowerCase().endsWith('.ts')) {
+                        u.pathname = path.replace(/\.ts$/i, '.m3u8');
+                        return u.toString();
+                    }
+                    return url;
+                } catch (e) {
+                    if (url.includes('extension=ts')) return url.replace(/extension=ts/gi, 'extension=m3u8');
+                    if (url.includes('extension=TS')) return url.replace(/extension=TS/g, 'extension=m3u8');
+                    return url.replace(/\.ts(\?|$)/i, '.m3u8$1');
+                }
+            }
+            buildVariants(originalUrl) {
+                const trimmed = originalUrl.trim();
+                const variants = [];
+                const type = this.detectType(trimmed);
+                const hlsUrl = this.formatHlsUrl(trimmed);
+                const isHls = type === 'hls' || trimmed.includes('.m3u8') || trimmed.includes('extension=m3u8');
+                const isTs = type === 'ts' || trimmed.includes('.ts') || trimmed.includes('extension=ts');
+                const hlsIsDifferent = hlsUrl !== trimmed;
+
+                if (isHls) {
+                    variants.push({ url: trimmed, type: 'hls', label: 'HLS (orijinal)' });
+                    if (hlsIsDifferent && this.detectType(hlsUrl) === 'hls') {
+                        variants.push({ url: hlsUrl, type: 'hls', label: 'HLS (dönüştürülmüş)' });
+                    }
+                } else if (isTs) {
+                    if (hlsIsDifferent && this.detectType(hlsUrl) === 'hls') {
+                        variants.push({ url: hlsUrl, type: 'hls', label: 'HLS (ts→m3u8)' });
+                    }
+                    variants.push({ url: trimmed, type: 'ts', label: 'TS (orijinal)' });
+                    if (location.protocol === 'https:' && trimmed.startsWith('http://')) {
+                        const httpsUrl = trimmed.replace(/^http:\/\//, 'https://');
+                        if (!variants.some(v => v.url === httpsUrl)) {
+                            variants.push({ url: httpsUrl, type: 'ts-https', label: 'TS (https)' });
+                        }
+                    }
+                } else if (type === 'mp4') {
+                    variants.push({ url: trimmed, type: 'mp4', label: 'MP4 (doğal)' });
+                } else {
+                    if (hlsIsDifferent && this.detectType(hlsUrl) === 'hls') {
+                        variants.push({ url: hlsUrl, type: 'hls', label: 'HLS (deneme)' });
+                    }
+                    variants.push({ url: trimmed, type: 'direct', label: 'Doğrudan (native)' });
+                }
+                // doppelganger azaltma
+                const seen = new Set();
+                return variants.filter(v => {
+                    if (seen.has(v.url)) return false;
+                    seen.add(v.url);
+                    return true;
+                });
+            }
+        }
+
+        const streamDetector = new StreamLinkDetector();
+
+        /* ===== OYNATICI PROGRAMI HALI VE YAPILANDIRMASI ===== */
         const PlayerState = {
-            IDLE: 'idle',
-            LOADING: 'loading',
-            CONNECTING: 'connecting',
-            PLAYING: 'playing',
-            BUFFERING: 'buffering',
-            RECONNECTING: 'reconnecting',
-            PAUSED: 'paused',
-            ERROR: 'error',
-            DESTROYED: 'destroyed'
-        };
-        const PlayerCfg = {
-            maxReconnectAttempts: 8,
-            baseReconnectDelay: 1200,
-            maxReconnectDelay: 15000,
-            hideControlsDelay: 4000,
-            stallThresholdMs: 6000,
-            stallCheckIntervalMs: 1000,
-            liveLatencyThresholdSec: 12,
-            progressUpdateMs: 400,
-            autoResumeDelayAfterRecover: 400
+            IDLE: 'idle', LOADING: 'loading', CONNECTING: 'connecting',
+            PLAYING: 'playing', BUFFERING: 'buffering', RECONNECTING: 'reconnecting',
+            PAUSED: 'paused', ERROR: 'error', DESTROYED: 'destroyed'
         };
 
+        const PlayerCfg = {
+            reconnectAttemptsLimit: 8,
+            reconnectBaseDelayMs: 1000,
+            reconnectMaxDelayMs: 20000,
+            reconnectJitterMs: 800,
+            controlsHideDelayMs: 4000,
+            stallThresholdMs: 5000,
+            stallCheckIntervalMs: 900,
+            liveLatencyThresholdSec: 12,
+            progressUpdateIntervalMs: 350,
+            strategyRetryDelayMs: 650,
+            maxStrategyFailCount: 6
+        };
+
+        // Oyuncu çalışma değişkenleri
         let hlsInstance = null;
         let mpegtsInstance = null;
         let activeStreamUrl = null;
         let activeStreamName = null;
         let originalStreamUrl = null;
-        let streamUrlVariants = [];
+        let variants = [];
         let currentVariantIndex = 0;
         let currentState = PlayerState.IDLE;
         let reconnectAttempts = 0;
         let reconnectTimer = null;
-        let hideControlsTimer = null;
-        let stallTimer = null;
-        let progressTimer = null;
-        let lastCurrentTime = 0;
-        let lastTimeUpdateAt = Date.now();
-        let hasReceivedCanPlay = false;
+        let controlsHideTimer = null;
+        let stallMonitorTimer = null;
+        let progressMonitorTimer = null;
+        let lastPosition = 0;
+        let lastPositionCheckTime = Date.now();
+        let hasPlayedOnce = false;
         let isPlayerOpen = false;
-        let isSeeking = false;
-        let pendingLiveSeek = false;
+        let currentStrategyName = '';
+        let strategyFailCount = 0;
+        let playerReady = false;
 
-        // DOM refs (init after DOMContentLoaded but we can get now)
+        // DOM referansları
         const videoEl = document.getElementById('hlsVideoEl');
         const playerContainer = document.getElementById('playerContainer');
         const playerTopBar = document.getElementById('playerTopBar');
@@ -934,223 +933,319 @@
         const autoplayOverlay = document.getElementById('autoplayOverlay');
         const autoplayBtn = document.getElementById('autoplayBtn');
 
-        /* ---- state & UI helpers ---- */
-        function setPlayerState(s){
+        /* ===== OYUNCU PROGRAMI DURUM Yönetim ===== */
+        function setPlayerState(s) {
             currentState = s;
-            pLog('STATE ->', s, 'attempt', reconnectAttempts);
-            updateUIForState();
+            pLog('STATE ->', s, 'variantIndex:', currentVariantIndex, 'attempt:', reconnectAttempts);
+            updateStateUI();
         }
-        function updateUIForState(){
-            const isPlaying = currentState===PlayerState.PLAYING;
-            const isBuffering = currentState===PlayerState.BUFFERING;
-            const isReconnecting = currentState===PlayerState.RECONNECTING;
-            const isPaused = currentState===PlayerState.PAUSED;
-            const isError = currentState===PlayerState.ERROR;
-            const isLoading = currentState===PlayerState.LOADING || currentState===PlayerState.CONNECTING;
 
-            // center button icon & visibility
-            if(isPlaying){
+        function updateStateUI() {
+            const isPlaying = currentState === PlayerState.PLAYING;
+            const isBuffering = currentState === PlayerState.BUFFERING;
+            const isReconnecting = currentState === PlayerState.RECONNECTING;
+            const isPaused = currentState === PlayerState.PAUSED;
+            const isError = currentState === PlayerState.ERROR;
+            const isLoading = currentState === PlayerState.LOADING || currentState === PlayerState.CONNECTING;
+
+            if (isPlaying) {
                 centerPlayBtn.classList.add('hidden');
                 centerPlayBtn.innerHTML = '<i class="fas fa-pause"></i>';
                 playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
-                playPauseBtn.setAttribute('aria-label','Durdur');
-            } else if(isPaused){
+                playPauseBtn.setAttribute('aria-label', 'Durdur');
+            } else if (isPaused) {
                 centerPlayBtn.classList.remove('hidden');
                 centerPlayBtn.innerHTML = '<i class="fas fa-play"></i>';
                 playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-                playPauseBtn.setAttribute('aria-label','Oynat');
+                playPauseBtn.setAttribute('aria-label', 'Oynat');
                 centerPlayBtn.classList.remove('buffering');
-            } else if(isBuffering || isReconnecting || isLoading){
+            } else if (isBuffering || isReconnecting || isLoading) {
                 centerPlayBtn.classList.remove('hidden');
                 centerPlayBtn.classList.add('buffering');
                 centerPlayBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            } else if(isError){
+            } else if (isError) {
                 centerPlayBtn.classList.add('hidden');
             }
-            // playPause button disabled when error? keep enabled for retry
         }
-        function showLoading(text, sub){
+
+        function showLoading(text, sub) {
             loadingText.textContent = text || 'Bağlantı kuruluyor...';
             loadingSub.textContent = sub || 'Canlı yayın yükleniyor';
             playerLoading.classList.remove('hidden');
             playerError.classList.remove('show');
+            autoplayOverlay.classList.remove('show');
         }
-        function hideLoading(){
+
+        function hideLoading() {
             playerLoading.classList.add('hidden');
         }
-        function showError(title, msg, showRetry){
+
+        function showError(title, msg, showRetry) {
             errorTitle.textContent = title || 'Yayın oynatılamıyor';
             errorMsg.textContent = msg || 'Yayın kaynağı şu anda kullanılamıyor.';
             retryBtn.style.display = showRetry ? 'inline-flex' : 'none';
             playerError.classList.add('show');
             hideLoading();
+            autoplayOverlay.classList.remove('show');
             setPlayerState(PlayerState.ERROR);
         }
-        function hideError(){
+
+        function hideError() {
             playerError.classList.remove('show');
         }
-        function showAutoplayBlock(){
+
+        function showAutoplayBlock() {
             autoplayOverlay.classList.add('show');
             hideLoading();
         }
-        function hideAutoplayBlock(){
+
+        function hideAutoplayBlock() {
             autoplayOverlay.classList.remove('show');
         }
 
-        /* ---- controls auto-hide ---- */
-        function showControls(){
+        /* ===== KONTROLERİ GÖSTER/GİZLE ===== */
+        function showControls() {
             playerTopBar.classList.remove('hidden');
             playerControls.classList.remove('hidden');
-            // center button hidden if playing handled elsewhere, but ensure controls visible
-            clearTimeout(hideControlsTimer);
-            // only auto-hide if playing or buffering
-            if(currentState===PlayerState.PLAYING || currentState===PlayerState.BUFFERING){
-                hideControlsTimer = setTimeout(()=> hideControls(), PlayerCfg.hideControlsDelay);
+            clearTimeout(controlsHideTimer);
+            if (currentState === PlayerState.PLAYING || currentState === PlayerState.BUFFERING) {
+                controlsHideTimer = setTimeout(() => hideControls(), PlayerCfg.controlsHideDelayMs);
             }
         }
-        function hideControls(){
-            // don't hide if error or autoplay overlay shown, or paused
-            if(playerError.classList.contains('show') || autoplayOverlay.classList.contains('show')) return;
-            if(currentState===PlayerState.PAUSED) return; // keep visible when paused
-            if(document.activeElement && playerControls.contains(document.activeElement)) return; // keep if focus inside controls
+
+        function hideControls() {
+            if (playerError.classList.contains('show')) return;
+            if (autoplayOverlay.classList.contains('show')) return;
+            if (currentState === PlayerState.PAUSED) return;
+            if (document.activeElement && playerControls.contains(document.activeElement)) return;
+            if (centerPlayBtn.classList.contains('hidden') && currentState === PlayerState.PAUSED) return;
             playerTopBar.classList.add('hidden');
             playerControls.classList.add('hidden');
         }
-        function scheduleHideControls(){
-            clearTimeout(hideControlsTimer);
-            hideControlsTimer = setTimeout(()=> hideControls(), PlayerCfg.hideControlsDelay);
+
+        function scheduleHideControls() {
+            clearTimeout(controlsHideTimer);
+            if (currentState === PlayerState.PLAYING || currentState === PlayerState.BUFFERING) {
+                controlsHideTimer = setTimeout(() => hideControls(), PlayerCfg.controlsHideDelayMs);
+            }
         }
 
-        /* ---- URL helpers ---- */
-        function isHlsUrl(url){
-            if(!url) return false;
-            const lower = url.toLowerCase();
-            // already m3u8
-            if(lower.includes('.m3u8')) return true;
-            if(lower.includes('extension=m3u8')) return true;
-            if(lower.includes('type=m3u8')) return true;
-            // .m3u ?
-            if(lower.includes('.m3u?') || lower.endsWith('.m3u')) return true;
-            return false;
-        }
-        function isTsUrl(url){
-            if(!url) return false;
-            const lower = url.toLowerCase();
-            if(lower.includes('extension=ts')) return true;
-            if(lower.split('?')[0].toLowerCase().endsWith('.ts')) return true;
-            // php live with mac/stream pattern often is TS
-            if(lower.includes('live.php') && lower.includes('extension=')) return true;
-            return false;
-        }
-        function buildStreamVariants(originalUrl){
-            if(!originalUrl) return [];
-            const variants = [];
-            const trimmed = originalUrl.trim();
-            const hlsUrl = formatStreamUrl(trimmed);
-            const origIsHls = isHlsUrl(trimmed);
-            const hlsIsDifferent = hlsUrl !== trimmed;
-            const hlsIsHls = isHlsUrl(hlsUrl);
-            // Titan gibi TS -> HLS dönüşümü varsa önce HLS dene (web için en uyumlu)
-            if(hlsIsDifferent && hlsIsHls){
-                variants.push({ url: hlsUrl, type: 'hls', label: 'HLS (m3u8)' });
-                variants.push({ url: trimmed, type: origIsHls ? 'hls' : 'ts', label: origIsHls ? 'HLS' : 'TS (orijinal)' });
-            } else if(origIsHls){
-                variants.push({ url: trimmed, type: 'hls', label: 'HLS' });
-                // TS varyantı da ekle? eğer hls ise ts variantı olmayabilir
-            } else {
-                // TS veya bilinmeyen — önce HLS varyantı varsa onu ekle, yoksa direkt TS
-                if(hlsIsDifferent){
-                    variants.push({ url: hlsUrl, type: 'hls', label: 'HLS (dönüştürülmüş)' });
-                    variants.push({ url: trimmed, type: 'ts', label: 'TS (ham)' });
-                } else {
-                    //örn: .mp4 veya direkt ts parametresiz
-                    const isTs = isTsUrl(trimmed);
-                    variants.push({ url: trimmed, type: isTs ? 'ts' : 'hls', label: isTs ? 'TS' : 'HLS' });
-                    // TS ise ek olarak HLS denemesi yok, tek varyant
-                }
+        /* ===== İLK BAŞLATMA VE STRATEJİ SEÇİMİ ===== */
+        function startPlayback(url, name) {
+            if (!url) {
+                showError('Geçersiz yayın', 'Yayın bağlantısı bulunamadı.', false);
+                return;
             }
-            // Deduplicate aynı URL
-            const dedup = [];
-            const seen = new Set();
-            for(const v of variants){ if(!seen.has(v.url)){ dedup.push(v); seen.add(v.url);} }
-            // Mixed content: https sayfada http stream bloklanır. https varyantı ekle (Titan https'i destekliyorsa şans ver)
-            if(location && location.protocol==='https:' && trimmed.startsWith('http://')){
-                const httpsTry = trimmed.replace(/^http:\/\//,'https://');
-                const httpsHls = formatStreamUrl(httpsTry);
-                // https HLS ve https TS varyantlarını da ekle (sona, fallback olarak)
-                [httpsHls, httpsTry].forEach(u=>{
-                    if(!seen.has(u)){
-                        dedup.push({ url: u, type: isHlsUrl(u)?'hls':'ts', label: (isHlsUrl(u)?'HLS':'TS')+' (https)' });
-                        seen.add(u);
+            isPlayerOpen = true;
+            activeStreamName = name || 'Canlı Yayın';
+            originalStreamUrl = url;
+            playerStreamTitle.textContent = activeStreamName;
+            playerContainer.classList.add('active');
+            playerContainer.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+
+            // Önceki oynatıcıyı temizle
+            cleanupPlayer(true);
+
+            // TLS/SSL veya CORS nedeniyle hata alırsak bildir
+            hideError();
+            hideAutoplayBlock();
+            hasPlayedOnce = false;
+            strategyFailCount = 0;
+            playerReady = false;
+
+            // Varyantları oluştur
+            variants = streamDetector.buildVariants(url);
+            currentVariantIndex = 0;
+            const first = variants[0];
+            showLoading('Bağlantı kuruluyor...', activeStreamName + (first ? ' (' + first.label + ')' : ''));
+            setPlayerState(PlayerState.CONNECTING);
+            showControls();
+
+            videoEl.muted = false;
+            videoEl.volume = 1;
+            updateVolumeUI();
+            startStallMonitor();
+            startProgressMonitor();
+
+            // Kütüphane hazır olup olmadığını bekle ve başlat
+            const startSoon = function() {
+                if (currentState === PlayerState.ERROR || currentState === PlayerState.DESTROYED) return;
+                // Her zaman ilk varyantı dene
+                attemptVariant(0);
+            };
+
+            // Kütüphane yüklenene kadar bekle (max 3 sn)
+            const waitLibs = setTimeout(startSoon, 200);
+            setTimeout(() => {
+                clearTimeout(waitLibs);
+                startSoon();
+            }, 2500);
+
+            // PIP kontrolü
+            if (!document.pictureInPictureEnabled || !videoEl.requestPictureInPicture) {
+                pipBtn.style.display = 'none';
+            } else {
+                pipBtn.style.display = 'flex';
+            }
+
+            setTimeout(() => closePlayerBtn.focus(), 180);
+            scheduleHideControls();
+
+            pLog('[START] URL:', url, 'variants:', variants.length, 'currentStrategy:', currentStrategyName);
+        }
+
+        function attemptVariant(index) {
+            if (index < 0 || index >= variants.length) {
+                // tüm varyantlar bitti
+                showError('Yayın oynatılamıyor',
+                    'Tüm oynatma yöntemleri denendi. İnternet bağlantınızı kontrol edin veya farklı bir yayın seçin.',
+                    true);
+                setPlayerState(PlayerState.ERROR);
+                return;
+            }
+
+            currentVariantIndex = index;
+            const variant = variants[index];
+            currentStrategyName = variant.label;
+            activeStreamUrl = variant.url;
+            reconnectAttempts = 0;
+            strategyFailCount = 0;
+
+            pLog('[VARIANT] deneyecek:', index, variant.label, variant.url);
+            showLoading('Yayın başlatılıyor...', variant.label);
+
+            try {
+                if (variant.type === 'hls') {
+                    if (isHlsJsAvailable()) {
+                        initHlsPlayer(variant.url, index);
+                    } else if (isNativeHlsSupported()) {
+                        initNativeHls(variant.url, index);
+                    } else {
+                        pWarn('HLS için kütüphane yok - bir sonrakine geç');
+                        tryVariantOrFail(index + 1);
+                    }
+                } else if (variant.type === 'ts') {
+                    if (isMpegtsJsAvailable()) {
+                        initMpegtsPlayer(variant.url, index);
+                    } else if (isNativeHlsSupported() && variant.url.includes('.m3u8')) {
+                        initNativeHls(variant.url, index);
+                    } else {
+                        pWarn('TS için mpegts.js yok ve native TS desteklemiyor - bir sonrakine geç');
+                        tryVariantOrFail(index + 1);
+                    }
+                } else if (variant.type === 'mp4') {
+                    initNativeMp4(variant.url, index);
+                } else {
+                    // default
+                    initNativeAny(variant.url, index);
+                }
+            } catch (err) {
+                pErr('[VARIANT] hata:', err);
+                tryVariantOrFail(index + 1);
+            }
+        }
+
+        function tryVariantOrFail(nextIndex) {
+            if (nextIndex >= variants.length) {
+                strategyFailCount++;
+                if (strategyFailCount > PlayerCfg.maxStrategyFailCount) {
+                    showError('Yayın oynatılamıyor',
+                        'Çok sayıda deneme yapıldı. İnternet bağlantınızı kontrol edin veya farklı bir yayın seçin. Harici Wuffy/Just Player deneyin.',
+                        true);
+                    setPlayerState(PlayerState.ERROR);
+                } else {
+                    showNotification('Yayın başlatılamadı, tekrar deneyecek...', 'sync', 2000);
+                    reconnectAttempts = 0;
+                    setTimeout(() => {
+                        if (isPlayerOpen) attemptVariant(0);
+                    }, PlayerCfg.strategyRetryDelayMs);
+                }
+                return;
+            }
+            attemptVariant(nextIndex);
+        }
+
+        /* ===== HLS.JS OYNATICI ===== */
+        function initHlsPlayer(url, variantIdx) {
+            pLog('[HLS] başlatılıyor:', url);
+            try {
+                const cfg = getHlsConfig();
+                hlsInstance = new Hls(cfg);
+                window._hls = hlsInstance;
+                hlsInstance.loadSource(url);
+                hlsInstance.attachMedia(videoEl);
+                activeStreamUrl = url;
+                currentVariantIndex = variantIdx;
+
+                hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+                    pLog('[HLS] manifest parsed');
+                    hideError();
+                    attemptAutoPlay();
+                });
+
+                hlsInstance.on(Hls.Events.ERROR, (event, data) => {
+                    handleHlsError(event, data, variantIdx);
+                });
+
+                hlsInstance.on(Hls.Events.LEVEL_LOADED, (event, data) => {
+                    pLog('[HLS] level loaded, live:', data.details && data.details.live);
+                });
+
+                hlsInstance.on(Hls.Events.FRAG_BUFFERED, () => {
+                    if (!hasPlayedOnce && videoEl.readyState >= 3) hasPlayedOnce = true;
+                });
+
+                // Bağlantı hatası - manifest fetch hatası
+                hlsInstance.on(Hls.Events.MANIFEST_LOADING, () => {
+                    pLog('[HLS] manifest loading...');
+                    showLoading('Manifest yükleniyor...', 'HLS playlist');
+                });
+
+                hlsInstance.on(Hls.Events.MEDIA_ATTACHED, () => {
+                    pLog('[HLS] media attached');
+                    hideLoading();
+                });
+
+                // Global hata yakalama: oynatıcı kapandığında temizle
+                videoEl.addEventListener('error', (e) => {
+                    pWarn('[VIDEO] error event:', videoEl.error);
+                    if (!isPlayerOpen) return;
+                    // HLS overwrite etmiyor - mevcut strateji hatası yoksa fallback
+                    if (hasNextVariant()) {
+                        pLog('[VIDEO] error'da diğer varyantı dene');
+                        tryVariantOrFail(currentVariantIndex + 1);
+                    } else if (currentState !== PlayerState.RECONNECTING && currentState !== PlayerState.ERROR) {
+                        scheduleReconnect('native-error');
                     }
                 });
-            }
-            // Titan özel: extension=ts içeren live.php için proxy'ye gerek olmadan her iki varyant da kalsın
-            pLog('[VARIANTS] built for', trimmed, dedup);
-            return dedup;
-        }
-        function hasNextVariant(){ return currentVariantIndex + 1 < streamUrlVariants.length; }
-        function tryNextVariant(reason){
-            if(!hasNextVariant()){
+
+                // Autoplay bloke olursa göster
+                const playPromise = videoEl.play();
+                if (playPromise && playPromise.catch) {
+                    playPromise.catch((err) => {
+                        if (err && err.name === 'NotAllowedError') {
+                            pWarn('[PLAY] otomatik oynatma engellendi');
+                            showAutoplayBlock();
+                        } else {
+                            pWarn('[PLAY] oynatma hatası:', err);
+                            if (hasNextVariant()) {
+                                tryVariantOrFail(currentVariantIndex + 1);
+                            }
+                        }
+                    });
+                }
+                return true;
+            } catch (err) {
+                pWarn('[HLS] başlatma hatası:', err);
                 return false;
             }
-            currentVariantIndex++;
-            const next = streamUrlVariants[currentVariantIndex];
-            pWarn('[FALLBACK] switching to variant', currentVariantIndex, next, 'reason', reason);
-            showLoading('Alternatif kaynak deneniyor...', next.label + ' • ' + next.url.slice(0,58));
-            showNotification('Alternatif yayın deneniyor ('+next.label+')','sync',2600);
-            reconnectAttempts = 0;
-            clearTimeout(reconnectTimer); reconnectTimer=null;
-            destroyHls(false);
-            setTimeout(()=> createAndStartForVariant(currentVariantIndex), 650);
-            return true;
         }
-        function formatStreamUrl(url){
-            if(!url) return url;
-            try{
-                const original = url.trim();
-                let out = original;
-                // Query param extension=ts -> m3u8 (case-insensitive)
-                // Use URL API if possible to preserve other params
-                let parsed;
-                try { parsed = new URL(out); } catch(e){ parsed=null; }
-                if(parsed){
-                    const params = parsed.searchParams;
-                    // handle extension param
-                    const ext = params.get('extension');
-                    if(ext && ext.toLowerCase()==='ts'){
-                        params.set('extension','m3u8');
-                        out = parsed.toString();
-                        parsed = new URL(out);
-                    }
-                    // handle ext param variants?
-                    // pathname .ts -> .m3u8
-                    const path = parsed.pathname;
-                    if(path.toLowerCase().endsWith('.ts')){
-                        parsed.pathname = path.replace(/\.ts$/i,'.m3u8');
-                        out = parsed.toString();
-                    }
-                } else {
-                    // fallback string replace (for non-absolute URLs, though IPTV usually absolute)
-                    if(out.includes('extension=ts')) out = out.replace(/extension=ts/gi,'extension=m3u8');
-                    if(out.includes('extension=TS')) out = out.replace(/extension=TS/g,'extension=m3u8');
-                    // replace .ts before ? or end, but keep query
-                    out = out.replace(/\.ts(\?|$)/i, '.m3u8$1');
-                }
-                // if url was .ts?extension=... edge, ensure not double
-                // If still .ts without m3u8, keep converted (we assume provider actually serves m3u8)
-                // Do not append random ext, keep as is if already m3u8
-                return out;
-            }catch(e){
-                pWarn('formatStreamUrl error', e);
-                return url;
-            }
-        }
-        function getHlsConfig(){
+
+        function getHlsConfig() {
             return {
                 enableWorker: true,
                 lowLatencyMode: false,
-                // Buffer — dengeli: hızlı başla, stabil kal
                 backBufferLength: 30,
                 maxBufferLength: 30,
                 maxMaxBufferLength: 60,
@@ -1158,11 +1253,9 @@
                 maxBufferHole: 0.5,
                 nudgeOffset: 0.1,
                 nudgeMaxRetry: 5,
-                // Live — stabilite öncelikli, edge'e 3 segment mesafede
                 liveSyncDurationCount: 3,
                 liveMaxLatencyDurationCount: 7,
                 liveDurationInfinity: true,
-                // Timeouts & Retry — canlı için makul, agresif değil
                 manifestLoadingTimeOut: 10000,
                 manifestLoadingMaxRetry: 3,
                 manifestLoadingRetryDelay: 1000,
@@ -1172,392 +1265,122 @@
                 fragLoadingTimeOut: 15000,
                 fragLoadingMaxRetry: 4,
                 fragLoadingRetryDelay: 1000,
-                // Playback
                 startPosition: -1,
                 abrEwmaDefaultEstimate: 500000,
                 abrBandWidthFactor: 0.95,
                 abrBandWidthUpFactor: 0.7,
                 enableSoftwareAES: true,
                 stretchShortVideoTrack: true,
-                appendErrorMaxRetry: 3,
-                // Cap level to avoid switching storm on flaky net? leave auto
+                appendErrorMaxRetry: 3
             };
         }
-        function isNativeHlsSupported(){
-            const v = document.createElement('video');
-            return !!v.canPlayType && v.canPlayType('application/vnd.apple.mpegurl') !== '';
-        }
 
-        /* ---- cleanup ---- */
-        function clearAllTimers(){
-            clearTimeout(reconnectTimer); reconnectTimer=null;
-            clearTimeout(hideControlsTimer); hideControlsTimer=null;
-            clearInterval(stallTimer); stallTimer=null;
-            clearInterval(progressTimer); progressTimer=null;
-        }
-        function destroyHls(fullCleanup=true){
-            clearAllTimers();
-            if(hlsInstance){
-                try{
-                    pLog('[HLS] destroy');
-                    hlsInstance.destroy();
-                }catch(e){ pWarn('hls destroy err', e); }
-                hlsInstance=null;
-            }
-            if(mpegtsInstance){
-                try{
-                    pLog('[MPEGTS] destroy');
-                    // mpegts.js api: pause, unload, detachMediaElement, destroy
-                    try{ mpegtsInstance.pause(); }catch(e){}
-                    try{ mpegtsInstance.unload(); }catch(e){}
-                    try{ mpegtsInstance.detachMediaElement(); }catch(e){}
-                    try{ mpegtsInstance.destroy(); }catch(e){}
-                }catch(e){ pWarn('mpegts destroy err', e); }
-                mpegtsInstance=null;
-            }
-            if(fullCleanup){
-                try{
-                    videoEl.pause();
-                    videoEl.removeAttribute('src');
-                    // also clear srcObject if any
-                    videoEl.load();
-                }catch(e){}
-                // remove event listeners? we keep listeners attached to videoEl permanently (not per-instance), so no need
-                hideLoading();
-                hideError();
-                hideAutoplayBlock();
-                // reset progress
-                progressPlayed.style.width='0%';
-                progressBuffer.style.width='0%';
-                progressHandle.style.left='0%';
-                timeDisplay.textContent='CANLI';
-                liveBtn.classList.add('live');
-                playerLiveBadgeInline.classList.remove('show');
-            }
-            // also remove any stray src
-            hasReceivedCanPlay = false;
-        }
+        function handleHlsError(event, data, variantIdx) {
+            pWarn('[HLS] ERROR:', data.type, data.details, data.fatal);
+            if (!isPlayerOpen) return;
 
-        /* ---- stall & progress ---- */
-        function startStallMonitor(){
-            clearInterval(stallTimer);
-            lastCurrentTime = videoEl.currentTime || 0;
-            lastTimeUpdateAt = Date.now();
-            stallTimer = setInterval(()=>{
-                if(!isPlayerOpen) return;
-                if(currentState!==PlayerState.PLAYING && currentState!==PlayerState.BUFFERING && currentState!==PlayerState.RECONNECTING) return;
-                if(videoEl.paused) return;
-                const now = Date.now();
-                const cur = videoEl.currentTime;
-                const deltaTime = now - lastTimeUpdateAt;
-                const deltaPos = Math.abs(cur - lastCurrentTime);
-                // If position advancing, update baseline
-                if(deltaPos > 0.15){
-                    lastCurrentTime = cur;
-                    lastTimeUpdateAt = now;
-                    // if was buffering,Recover
-                    if(currentState===PlayerState.BUFFERING){
-                        pLog('[STALL] recovered, pos advancing');
-                        setPlayerState(PlayerState.PLAYING);
-                        hideLoading();
-                        reconnectAttempts = 0; // reset on recovery
+            if (data.fatal) {
+                const isManifestFatal = data.details && (
+                    data.details.includes('MANIFEST') ||
+                    data.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR ||
+                    data.details === Hls.ErrorDetails.LEVEL_LOAD_TIMEOUT
+                );
+                const isNetworkFatal = data.type === Hls.ErrorTypes.NETWORK_ERROR && data.fatal;
+
+                if (isManifestFatal || isNetworkFatal) {
+                    pLog('[HLS] fatal hata - diğer varyantı deneyecek');
+                    try { hlsInstance.destroy(); } catch (e) {}
+                    hlsInstance = null;
+                    if (hasNextVariant()) {
+                        tryVariantOrFail(variantIdx + 1);
+                    } else {
+                        showError('Yayın oynatılamıyor', 'HLS playlist yüklenemedi. Kaynak bulunamadı veya erişim yok. Harici Wuffy/Just Player deneyin.', true);
                     }
                     return;
                 }
-                // Not advancing
-                if(deltaTime > PlayerCfg.stallThresholdMs){
-                    pWarn('[STALL] detected, cur', cur, 'deltaTime', deltaTime);
-                    if(currentState!==PlayerState.RECONNECTING){
-                        setPlayerState(PlayerState.BUFFERING);
-                        showLoading('Yayın takıldı, toparlanıyor...', 'Ağ kontrol ediliyor');
-                        scheduleReconnect('stall');
-                    }
-                }
-            }, PlayerCfg.stallCheckIntervalMs);
-        }
-        function startProgressMonitor(){
-            clearInterval(progressTimer);
-            progressTimer = setInterval(()=>{
-                if(!isPlayerOpen) return;
-                updateProgress();
-                updateLiveLatency();
-            }, PlayerCfg.progressUpdateMs);
-        }
-        function updateProgress(){
-            const v = videoEl;
-            // buffer
-            try{
-                if(v.buffered && v.buffered.length){
-                    const bufferedEnd = v.buffered.end(v.buffered.length-1);
-                    // for live, use seekable to determine window
-                    let duration = v.duration;
-                    let start = 0, end = duration;
-                    if(v.seekable && v.seekable.length){
-                        start = v.seekable.start(0);
-                        end = v.seekable.end(v.seekable.length-1);
-                        duration = end - start;
-                    }
-                    if(duration && isFinite(duration) && duration>0){
-                        const curFromStart = v.currentTime - start;
-                        const bufFromStart = bufferedEnd - start;
-                        const playedPct = Math.max(0, Math.min(100, (curFromStart / duration)*100));
-                        const bufPct = Math.max(0, Math.min(100, (bufFromStart / duration)*100));
-                        progressPlayed.style.width = playedPct + '%';
-                        progressBuffer.style.width = bufPct + '%';
-                        progressHandle.style.left = playedPct + '%';
-                        seekBar.value = playedPct;
-                        seekBar.setAttribute('aria-valuenow', Math.round(playedPct));
-                        // time display: if live show CANLI else show time
-                        if(isLiveStream()){
-                            timeDisplay.textContent = 'CANLI';
-                        } else {
-                            const curStr = formatTime(v.currentTime);
-                            const durStr = isFinite(v.duration) ? formatTime(v.duration) : 'CANLI';
-                            timeDisplay.textContent = `${curStr} / ${durStr}`;
-                        }
-                        return;
-                    }
-                }
-            }catch(e){}
-            // fallback
-            if(isLiveStream()){
-                // live indeterminate -> keep bar near 90-100% to indicate live
-                const latency = getLiveLatency();
-                // if latency high, shorten bar?
-                let pct = 92;
-                if(latency!==null){
-                    if(latency>30) pct=70;
-                    else if(latency>15) pct=82;
-                }
-                progressPlayed.style.width = pct + '%';
-                progressBuffer.style.width = Math.min(100, pct+6)+'%';
-                progressHandle.style.left = pct+'%';
-                timeDisplay.textContent='CANLI';
-            }
-        }
-        function formatTime(s){
-            if(!isFinite(s) || s<0) return '00:00';
-            s=Math.floor(s);
-            const m=Math.floor(s/60); const sec=s%60;
-            return (m<10?'0':'')+m+':'+(sec<10?'0':'')+sec;
-        }
-        function isLiveStream(){
-            // IPTV always treat as live. But also detect via duration
-            if(!isFinite(videoEl.duration) || videoEl.duration===Infinity) return true;
-            if(videoEl.seekable && videoEl.seekable.length){
-                const dur = videoEl.seekable.end(0) - videoEl.seekable.start(0);
-                // if seekable window large and duration Infinity? already live.
-                // For safety, assume live if currentList item? we set live always for IPTV
-            }
-            // default: considered live for this app
-            return true;
-        }
-        function getLiveLatency(){
-            try{
-                if(videoEl.seekable && videoEl.seekable.length){
-                    const liveEdge = videoEl.seekable.end(videoEl.seekable.length-1);
-                    return Math.max(0, liveEdge - videoEl.currentTime);
-                }
-            }catch(e){}
-            return null;
-        }
-        function updateLiveLatency(){
-            const latency = getLiveLatency();
-            const threshold = PlayerCfg.liveLatencyThresholdSec;
-            if(latency===null){
-                liveBtn.classList.add('live');
-                playerLiveBadgeInline.classList.add('show');
-                liveBtn.title='Canlı yayın';
-                return;
-            }
-            if(latency <= threshold + 2){
-                // near live
-                liveBtn.classList.add('live');
-                playerLiveBadgeInline.classList.add('show');
-                liveBtn.title='Canlı yayın';
-            } else {
-                // behind
-                liveBtn.classList.remove('live');
-                playerLiveBadgeInline.classList.remove('show');
-                liveBtn.title='Canlı yayına dön ('+Math.round(latency)+'sn geri)';
-            }
-            // also update timeDisplay with latency hint? keep CANLI but tooltip
-            if(latency> threshold){
-                timeDisplay.textContent = `CANLI • -${Math.round(latency)}sn`;
-            } else {
-                timeDisplay.textContent = `CANLI`;
-            }
-        }
-        function seekToLive(){
-            try{
-                if(videoEl.seekable && videoEl.seekable.length){
-                    const liveEdge = videoEl.seekable.end(videoEl.seekable.length-1);
-                    const target = Math.max(0, liveEdge - 1.2);
-                    pLog('[LIVE] seekToLive', liveEdge, '->', target);
-                    videoEl.currentTime = target;
-                    showLoading('Canlı yayına geçiliyor...','');
-                    setTimeout(()=> hideLoading(), 900);
-                    showControls();
-                } else if(hlsInstance && hlsInstance.liveSyncPosition){
-                    const pos = hlsInstance.liveSyncPosition;
-                    if(pos) videoEl.currentTime = pos;
-                } else {
-                    showNotification('Canlı konuma geçilemedi','info-circle',2000);
-                }
-                liveBtn.classList.add('live');
-            }catch(e){
-                pWarn('seekToLive err', e);
-                showNotification('Canlı yayına geçilemedi','exclamation-triangle',2000);
-            }
-        }
 
-        /* ---- reconnect with exponential backoff ---- */
-        function scheduleReconnect(reason){
-            if(!isPlayerOpen) return;
-            if(reconnectAttempts >= PlayerCfg.maxReconnectAttempts){
-                pWarn('[RECONNECT] max attempts reached', reason);
-                showError('Yayın kaynağı şu anda kullanılamıyor.', 'İnternet bağlantınızı kontrol edin veya farklı bir yayın deneyin.', true);
-                setPlayerState(PlayerState.ERROR);
-                return;
-            }
-            if(reconnectTimer) return; // already scheduled
-            const delay = Math.min(PlayerCfg.baseReconnectDelay * Math.pow(1.7, reconnectAttempts) + Math.random()*600, PlayerCfg.maxReconnectDelay);
-            pLog(`[RECONNECT] schedule ${reason} attempt ${reconnectAttempts+1}/${PlayerCfg.maxReconnectAttempts} in ${Math.round(delay)}ms`);
-            setPlayerState(PlayerState.RECONNECTING);
-            showLoading('Yayın yeniden bağlanıyor...', `Deneme ${reconnectAttempts+1}/${PlayerCfg.maxReconnectAttempts}`);
-            // jitter
-            reconnectTimer = setTimeout(()=>{
-                reconnectTimer=null;
-                doReconnect(reason);
-            }, delay);
-        }
-        function doReconnect(reason){
-            if(!isPlayerOpen || !activeStreamUrl) return;
-            // Titan varyantı: ilk birkaç denemeden sonra sıradaki varyanta geç
-            // Eğer HLS varyantı manifest hatası nedeniyle tekrar ediyorsa, hemen TS'ye geç
-            if(hasNextVariant() && (reason==='network' || reason==='manifest' || reason==='stall') && reconnectAttempts>=1){
-                // 1 başarısız denemeden sonra TS ham'ı dene (Titan için en hızlı yol)
-                if(tryNextVariant('reconnect-'+reason)){
-                    return;
-                }
-            }
-            reconnectAttempts++;
-            pLog('[RECONNECT] doReconnect', reason, 'attempt', reconnectAttempts, 'variant', currentVariantIndex);
-            if(hlsInstance){
-                try{
-                    if(reason==='stall' || reason==='network' || reason==='fragment' || reason==='manifest'){
-                        pLog('[RECONNECT] hls.startLoad()');
-                        hlsInstance.startLoad();
-                        clearTimeout(reconnectTimer);
-                        reconnectTimer = setTimeout(()=>{
-                            reconnectTimer=null;
-                            if(currentState===PlayerState.RECONNECTING || currentState===PlayerState.BUFFERING){
-                                pLog('[RECONNECT] startLoad not enough, recreating/fallback');
-                                if(hasNextVariant()){
-                                    tryNextVariant('startLoad-fail');
-                                } else {
-                                    const url = activeStreamUrl;
-                                    destroyHls(false);
-                                    createAndStart(url, false);
-                                }
-                            }
-                        }, 5000);
-                        return;
-                    }
-                    if(reason==='media' || reason==='media-fallback'){
-                        try{
-                            pLog('[RECONNECT] recoverMediaError');
-                            hlsInstance.recoverMediaError();
-                            clearTimeout(reconnectTimer);
-                            reconnectTimer = setTimeout(()=>{
-                                reconnectTimer=null;
-                                if(currentState===PlayerState.RECONNECTING){
-                                    if(hasNextVariant() && reconnectAttempts>=2){
-                                        tryNextVariant('media-recover-fail');
-                                    } else {
-                                        const url = activeStreamUrl;
-                                        destroyHls(false);
-                                        createAndStart(url, false);
+                switch (data.type) {
+                    case Hls.ErrorTypes.NETWORK_ERROR:
+                        pLog('[HLS] network error - reconnect schedule');
+                        scheduleReconnect('network');
+                        break;
+                    case Hls.ErrorTypes.MEDIA_ERROR:
+                        pLog('[HLS] media error - recover');
+                        if (reconnectAttempts < 2) {
+                            try {
+                                hlsInstance.recoverMediaError();
+                                setPlayerState(PlayerState.RECONNECTING);
+                                showLoading('Medya hatası toparlanıyor...');
+                                reconnectTimer = setTimeout(() => {
+                                    reconnectTimer = null;
+                                    if (currentState === PlayerState.RECONNECTING) {
+                                        scheduleReconnect('media-fallback');
                                     }
-                                }
-                            }, 4000);
-                            return;
-                        }catch(e){ pWarn('recoverMediaError failed', e); }
-                    }
-                }catch(e){ pWarn('doReconnect hls op failed', e); }
-                if(hasNextVariant() && reconnectAttempts>=2){
-                    tryNextVariant('hls-recreate');
-                    return;
-                }
-                const url = activeStreamUrl;
-                destroyHls(false);
-                createAndStart(url, false);
-            } else if(mpegtsInstance){
-                // mpegts.js için: önce reload, olmazsa varyant değiştir
-                pLog('[RECONNECT] mpegts reload');
-                try{ mpegtsInstance.unload(); }catch(e){}
-                try{ mpegtsInstance.load(); }catch(e){}
-                videoEl.play().catch(()=>{});
-                setTimeout(()=>{
-                    if(currentState===PlayerState.RECONNECTING || currentState===PlayerState.BUFFERING){
-                        if(hasNextVariant()){
-                            tryNextVariant('mpegts-stall');
+                                }, 3500);
+                            } catch (e) {
+                                scheduleReconnect('media');
+                            }
                         } else {
-                            // aynı TS'yi tekrar dene
+                            scheduleReconnect('media');
+                        }
+                        break;
+                    default:
+                        if (hasNextVariant()) {
+                            tryVariantOrFail(variantIdx + 1);
+                        } else {
+                            showError('Yayın oynatılamıyor', 'Beklenmeyen oynatıcı hatası. Harici Wuffy/Just Player ile deneyin.', true);
                             destroyHls(false);
-                            createAndStartForVariant(currentVariantIndex);
                         }
-                    }
-                }, 4000);
+                        break;
+                }
             } else {
-                // native / TS ham
-                if(videoEl.src && activeStreamUrl){
-                    pLog('[RECONNECT] native reload', activeStreamUrl);
-                    // native'de de bir kez daha dene, sonra varyant geç
-                    if(hasNextVariant() && reconnectAttempts>1){
-                        tryNextVariant('native-retry');
-                        return;
-                    }
-                    videoEl.load();
-                    videoEl.play().catch(()=>{});
-                    setTimeout(()=>{
-                        if(videoEl.readyState===0){
-                            if(hasNextVariant()) tryNextVariant('native-fail');
-                            else { destroyHls(false); createAndStart(activeStreamUrl, false); }
-                        }
-                    }, 3000);
-                } else {
-                    if(hasNextVariant()) tryNextVariant('no-src');
-                    else createAndStart(activeStreamUrl, false);
+                // Non-fatal hatalar
+                if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR) {
+                    setPlayerState(PlayerState.BUFFERING);
+                    showLoading('Tampon bellek dolduruluyor...');
+                    setTimeout(() => {
+                        if (currentState === PlayerState.BUFFERING) hideLoading();
+                    }, 2500);
+                } else if (data.details === Hls.ErrorDetails.FRAG_LOAD_ERROR || data.details === Hls.ErrorDetails.FRAG_LOAD_TIMEOUT) {
+                    setPlayerState(PlayerState.BUFFERING);
                 }
             }
-        }
-        function resetReconnectOnSuccess(){
-            if(reconnectAttempts>0){
-                pLog('[RECONNECT] reset attempts (was', reconnectAttempts, ')');
-            }
-            reconnectAttempts=0;
-            clearTimeout(reconnectTimer); reconnectTimer=null;
         }
 
-        /* ---- HLS / MPEG-TS creation — TITAN + TS uyumlu ---- */
-        function startMpegTs(url){
-            const lib = window.mpegts;
-            if(!lib || !lib.isSupported()){
-                pWarn('[MPEGTS] not supported, fallback to native');
-                return false;
+        /* ===== NATIVE HLS ===== */
+        function initNativeHls(url, variantIdx) {
+            pLog('[NATIVE HLS] deneyecek:', url);
+            videoEl.src = url;
+            activeStreamUrl = url;
+            currentVariantIndex = variantIdx;
+            videoEl.load();
+            const p = videoEl.play();
+            if (p && p.catch) {
+                p.catch(err => {
+                    pWarn('[NATIVE HLS] oynatma engellendi:', err);
+                    if (err && err.name === 'NotAllowedError') {
+                        showAutoplayBlock();
+                    } else {
+                        if (hasNextVariant()) {
+                            tryVariantOrFail(variantIdx + 1);
+                        } else {
+                            showError('Yayın oynatılamıyor', 'Doğal HLS oynatılamadı. Harici oynatıcı deneyin.', true);
+                        }
+                    }
+                });
             }
-            // mpegts.js is for raw MPEG-TS progressive (extension=ts). Titan live.php TS akışı için ideal.
-            try{
-                pLog('[MPEGTS] createPlayer for', url);
-                // ensure previous destroyed
-                if(mpegtsInstance){
-                    try{ mpegtsInstance.destroy(); }catch(e){}
-                    mpegtsInstance=null;
+        }
+
+        /* ===== MPEGTS.JS OYNATICI ===== */
+        function initMpegtsPlayer(url, variantIdx) {
+            pLog('[MPEGTS] başlatılıyor:', url);
+            try {
+                if (mpegtsInstance) {
+                    try { mpegtsInstance.destroy(); } catch (e) {}
+                    mpegtsInstance = null;
                 }
-                // mpegts.js config — canlı için
-                const player = lib.createPlayer({
-                    type: 'mse', // 'mse' live is stable, fallback to 'mpegts' if needed
+                mpegtsInstance = mpegts.createPlayer({
+                    type: 'mse',
                     isLive: true,
                     url: url,
                     enableWorker: true,
@@ -1568,395 +1391,499 @@
                     liveBufferLatencyMaxLatency: 3,
                     liveBufferLatencyMinRemain: 0.8
                 });
-                // Alternate: some builds require type:'mpegts'
-                // If mse fails we fallback below via error event
-                mpegtsInstance = player;
-                window._mpegts = player;
-                player.attachMediaElement(videoEl);
-                player.load();
-                const playPromise = videoEl.play();
-                if(playPromise && playPromise.catch) playPromise.catch(err=>{
-                    pWarn('[MPEGTS][PLAY] blocked', err);
-                    if(err && err.name==='NotAllowedError') showAutoplayBlock();
-                });
-                player.on(lib.Events.ERROR, (type, detail)=>{
-                    pWarn('[MPEGTS][ERROR]', type, detail);
-                    // detay: NetworkError, MediaError
-                    if(!isPlayerOpen) return;
-                    // Try next variant if available, otherwise reconnect
-                    if(hasNextVariant()){
-                        tryNextVariant('mpegts-'+type);
+                mpegtsInstance.attachMediaElement(videoEl);
+                mpegtsInstance.load();
+                activeStreamUrl = url;
+                currentVariantIndex = variantIdx;
+
+                mpegtsInstance.on(mpegts.Events.ERROR, (type, detail) => {
+                    pWarn('[MPEGTS] ERROR:', type, detail);
+                    if (!isPlayerOpen) return;
+                    if (hasNextVariant()) {
+                        tryVariantOrFail(currentVariantIndex + 1);
                     } else {
                         setPlayerState(PlayerState.BUFFERING);
-                        scheduleReconnect('network');
+                        scheduleReconnect('mpegts-error');
                     }
                 });
-                player.on(lib.Events.METADATA_ARRIVED, ()=>{ pLog('[MPEGTS] METADATA'); hideLoading(); });
-                player.on(lib.Events.MEDIA_INFO, (info)=>{ pLog('[MPEGTS] MEDIA_INFO', info); });
-                // mpegts.js doesn't emit MANIFEST_PARSED; use playing event for success
-                activeStreamUrl = url;
+
+                mpegtsInstance.on(mpegts.Events.METADATA_ARRIVED, () => {
+                    pLog('[MPEGTS] metadata arrived');
+                    hideLoading();
+                });
+
+                mpegtsInstance.on(mpegts.Events.MEDIA_INFO, (info) => {
+                    pLog('[MPEGTS] media info:', info);
+                });
+
+                const playPromise = videoEl.play();
+                if (playPromise && playPromise.catch) {
+                    playPromise.catch(err => {
+                        pWarn('[MPEGTS] oynatma engellendi:', err);
+                        if (err && err.name === 'NotAllowedError') {
+                            showAutoplayBlock();
+                        }
+                    });
+                }
                 return true;
-            }catch(e){
-                pWarn('[MPEGTS] create failed', e);
+            } catch (err) {
+                pWarn('[MPEGTS] başlatma hatası:', err);
                 return false;
             }
         }
-        function startNativeHls(url){
-            pLog('[NATIVE] using native HLS for', url);
+
+        /* ===== NATIVE MP4 ===== */
+        function initNativeMp4(url, variantIdx) {
+            pLog('[MP4] doğal oynatma:', url);
             videoEl.src = url;
             activeStreamUrl = url;
+            currentVariantIndex = variantIdx;
             videoEl.load();
             const p = videoEl.play();
-            if(p && p.catch) p.catch(err=>{
-                pWarn('[NATIVE] autoplay blocked', err);
-                if(err && err.name==='NotAllowedError') showAutoplayBlock();
-                else if(hasNextVariant()){
-                    // native failed (e.g., TS not supported) → dene diğer varyant
-                    setTimeout(()=> tryNextVariant('native-playfail'), 800);
-                }
-            });
-            return true;
-        }
-        function createAndStartForVariant(idx){
-            if(!isPlayerOpen) return;
-            if(idx<0 || idx>=streamUrlVariants.length){
-                pWarn('[START] invalid variant idx', idx);
-                return;
-            }
-            const variant = streamUrlVariants[idx];
-            currentVariantIndex = idx;
-            const url = variant.url;
-            activeStreamUrl = url;
-            pLog('[START] createAndStartForVariant', idx, variant);
-            // temizlik: önceki instance'lar destroyHls(false) zaten çağrılmadıysa burada da
-            if(hlsInstance){ try{ hlsInstance.destroy(); }catch(e){} hlsInstance=null; }
-            if(mpegtsInstance){ try{ try{ mpegtsInstance.pause(); }catch(e){} try{ mpegtsInstance.unload(); }catch(e){} try{ mpegtsInstance.detachMediaElement(); }catch(e){} try{ mpegtsInstance.destroy(); }catch(e){} }catch(e){} mpegtsInstance=null; }
-
-            // TS tipi için öncelik: mpegts.js > native
-            if(variant.type === 'ts'){
-                // Titan canlı: önce mpegts.js dene, olmazsa native progressive
-                const ok = startMpegTs(url);
-                if(!ok){
-                    // mpegts desteklemiyorsa native dene
-                    videoEl.src = url;
-                    activeStreamUrl = url;
-                    videoEl.load();
-                    const pr = videoEl.play();
-                    if(pr && pr.catch) pr.catch(err=>{
-                        pWarn('[TS][NATIVE] play blocked', err);
-                        if(err && err.name==='NotAllowedError') showAutoplayBlock();
-                    });
-                }
-                // TS için HLS fallback yok, ama hata olursa variant fallback tetiklenecek (video error listener)
-                return;
-            }
-
-            // HLS tipi
-            if(Hls.isSupported()){
-                const cfg = getHlsConfig();
-                pLog('[HLS] config', cfg);
-                hlsInstance = new Hls(cfg);
-                window._hls = hlsInstance;
-
-                hlsInstance.on(Hls.Events.MEDIA_ATTACHED, ()=>{ pLog('[HLS] MEDIA_ATTACHED'); });
-                hlsInstance.on(Hls.Events.MANIFEST_LOADING, ()=>{ pLog('[HLS] MANIFEST_LOADING'); });
-                hlsInstance.on(Hls.Events.MANIFEST_PARSED, (evt, data)=>{
-                    pLog('[HLS] MANIFEST_PARSED', data);
-                    hideError();
-                    const playPromise = videoEl.play();
-                    if(playPromise && playPromise.catch){
-                        playPromise.then(()=>{
-                            pLog('[PLAY] autoplay success after MANIFEST_PARSED');
-                            hideAutoplayBlock();
-                        }).catch(err=>{
-                            pWarn('[PLAY] autoplay blocked', err);
-                            if(err && err.name==='NotAllowedError') showAutoplayBlock();
-                        });
+            if (p && p.catch) {
+                p.catch(err => {
+                    pWarn('[MP4] oynatma engellendi:', err);
+                    if (err && err.name === 'NotAllowedError') {
+                        showAutoplayBlock();
+                    } else {
+                        if (hasNextVariant()) {
+                            tryVariantOrFail(variantIdx + 1);
+                        } else {
+                            showError('Yayın oynatılamıyor', 'MP4 yüklenemedi. Link veya erişim sorunu olabilir.', true);
+                        }
                     }
                 });
-                hlsInstance.on(Hls.Events.LEVEL_LOADED, (evt,data)=>{
-                    pLog('[HLS] LEVEL_LOADED', data.details ? data.details.live : '');
-                });
-                hlsInstance.on(Hls.Events.FRAG_BUFFERED, ()=>{
-                    if(!hasReceivedCanPlay && videoEl.readyState>=3) hasReceivedCanPlay=true;
-                });
-                hlsInstance.on(Hls.Events.ERROR, (evt, data)=>{
-                    pWarn('[HLS][ERROR]', data.type, data.details, data);
-                    // Titan HLS varyantı başarısız olursa (404/ manifest) → TS varyantına fallback
-                    const isManifestError = data.details && (
-                        data.details.includes('MANIFEST') ||
-                        data.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR ||
-                        data.details === Hls.ErrorDetails.LEVEL_LOAD_TIMEOUT
-                    );
-                    const isNetworkFatal = data.type === Hls.ErrorTypes.NETWORK_ERROR && data.fatal;
-                    if(!data.fatal){
-                        if(data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR){
-                            setPlayerState(PlayerState.BUFFERING);
-                            showLoading('Ara bellek dolduruluyor...','');
-                            setTimeout(()=>{ if(currentState===PlayerState.BUFFERING) hideLoading(); }, 2500);
-                        } else if(data.details === Hls.ErrorDetails.FRAG_LOAD_ERROR || data.details===Hls.ErrorDetails.FRAG_LOAD_TIMEOUT){
-                            setPlayerState(PlayerState.BUFFERING);
+            }
+        }
+
+        /* ===== GENEL NATIVE (varsayılan) ===== */
+        function initNativeAny(url, variantIdx) {
+            pLog('[NATIVE] genel deneyecek:', url);
+            videoEl.src = url;
+            activeStreamUrl = url;
+            currentVariantIndex = variantIdx;
+            videoEl.load();
+            const p = videoEl.play();
+            if (p && p.catch) {
+                p.catch(err => {
+                    pWarn('[NATIVE] oynatma engellendi:', err);
+                    if (err && err.name === 'NotAllowedError') {
+                        showAutoplayBlock();
+                    } else {
+                        if (hasNextVariant()) {
+                            tryVariantOrFail(variantIdx + 1);
+                        } else {
+                            if (strategyFailCount < 3) {
+                                showError('Yayın başlatılamadı', 'İlk deneme başarısız. Tekrar deneyecek...', true);
+                                setTimeout(() => {
+                                    if (isPlayerOpen) attemptVariant(0);
+                                }, 2000);
+                            } else {
+                                showError('Yayın oynatılamıyor', 'Birden fazla deneme başarısız. Harici Wuffy/Just Player deneyin.', true);
+                            }
                         }
+                    }
+                });
+            }
+        }
+
+        /* ===== OTOMATİK OYNATMA ÇAĞRISI ===== */
+        function attemptAutoPlay() {
+            const p = videoEl.play();
+            if (p && p.catch) {
+                p.catch(err => {
+                    pWarn('[AUTO] oynatma engellendi:', err);
+                    if (err && err.name === 'NotAllowedError') {
+                        showAutoplayBlock();
+                    }
+                });
+            }
+        }
+
+        /* ===== HAZIRLIK TEKRAR ===== */
+        function hasNextVariant() {
+            return currentVariantIndex + 1 < variants.length;
+        }
+
+        function scheduleReconnect(reason) {
+            if (!isPlayerOpen) return;
+            if (reconnectAttempts >= PlayerCfg.reconnectAttemptsLimit) {
+                pWarn('[RECONNECT] maksimum deneme sayısına ulaşıldı:', reason);
+                showError('Yayın kaynağı şu anda kullanılamıyor.', 'İnternet bağlantınızı kontrol edin veya farklı bir yayın deneyin.', true);
+                setPlayerState(PlayerState.ERROR);
+                return;
+            }
+            if (reconnectTimer) return;
+
+            const delay = Math.min(
+                PlayerCfg.reconnectBaseDelayMs * Math.pow(1.6, reconnectAttempts) +
+                Math.random() * PlayerCfg.reconnectJitterMs,
+                PlayerCfg.reconnectMaxDelayMs
+            );
+            pLog(`[RECONNECT] planla: ${reason} deneme ${reconnectAttempts+1}/${PlayerCfg.reconnectAttemptsLimit} ${Math.round(delay)}ms`);
+            setPlayerState(PlayerState.RECONNECTING);
+            showLoading('Yayın yeniden bağlanıyor...', `Deneme ${reconnectAttempts+1}/${PlayerCfg.reconnectAttemptsLimit}`);
+
+            reconnectTimer = setTimeout(() => {
+                reconnectTimer = null;
+                doReconnect(reason);
+            }, delay);
+        }
+
+        function doReconnect(reason) {
+            if (!isPlayerOpen || !activeStreamUrl) return;
+            if (hasNextVariant() && (reason === 'network' || reason === 'stall' || reason === 'manifest') && reconnectAttempts >= 1) {
+                pLog('[RECONNECT] varyanta geç:', reason);
+                tryVariantOrFail(currentVariantIndex + 1);
+                return;
+            }
+            reconnectAttempts++;
+            pLog('[RECONNECT] deneme:', reconnectAttempts, 'sebep:', reason, 'variantIndex:', currentVariantIndex);
+
+            if (hlsInstance) {
+                try {
+                    if (reason === 'stall' || reason === 'network' || reason === 'fragment' || reason === 'manifest') {
+                        pLog('[RECONNECT] hls.startLoad()');
+                        hlsInstance.startLoad();
+                        reconnectTimer = setTimeout(() => {
+                            reconnectTimer = null;
+                            if (currentState === PlayerState.RECONNECTING || currentState === PlayerState.BUFFERING) {
+                                pLog('[RECONNECT] startLoad yetersiz - varyanta geç');
+                                if (hasNextVariant()) {
+                                    tryVariantOrFail(currentVariantIndex + 1);
+                                } else {
+                                    const url = activeStreamUrl;
+                                    destroyHls(false);
+                                    initHlsPlayer(url, currentVariantIndex);
+                                }
+                            }
+                        }, 5000);
                         return;
                     }
-                    // fatal — önce alternatif varyant dene (Titan için kritik!)
-                    if(isManifestError || isNetworkFatal){
-                        // HLS varyantı (m3u8) başarısız → varsa TS ham dene
-                        if(hasNextVariant()){
-                            pLog('[HLS] fatal but fallback available, trying next variant');
-                            // destroy current hls before fallback to avoid double instance
-                            try{ hlsInstance.destroy(); }catch(e){} hlsInstance=null;
-                            tryNextVariant('hls-'+data.details);
+                    if (reason === 'media' || reason === 'media-fallback') {
+                        try {
+                            pLog('[RECONNECT] recoverMediaError()');
+                            hlsInstance.recoverMediaError();
+                            reconnectTimer = setTimeout(() => {
+                                reconnectTimer = null;
+                                if (currentState === PlayerState.RECONNECTING) {
+                                    if (hasNextVariant() && reconnectAttempts >= 2) {
+                                        tryVariantOrFail(currentVariantIndex + 1);
+                                    } else {
+                                        const url = activeStreamUrl;
+                                        destroyHls(false);
+                                        initHlsPlayer(url, currentVariantIndex);
+                                    }
+                                }
+                            }, 4000);
                             return;
+                        } catch (e) {
+                            pWarn('recoverMediaError başarısız:', e);
+                            scheduleReconnect('media');
                         }
                     }
-                    switch(data.type){
-                        case Hls.ErrorTypes.NETWORK_ERROR:
-                            pLog('[HLS] fatal NETWORK_ERROR', data.details);
-                            scheduleReconnect('network');
-                            break;
-                        case Hls.ErrorTypes.MEDIA_ERROR:
-                            pLog('[HLS] fatal MEDIA_ERROR', data.details);
-                            if(reconnectAttempts < 2){
-                                try{
-                                    pLog('[HLS] recoverMediaError()');
-                                    hlsInstance.recoverMediaError();
-                                    setPlayerState(PlayerState.RECONNECTING);
-                                    showLoading('Medya hatası toparlanıyor...','');
-                                    clearTimeout(reconnectTimer);
-                                    reconnectTimer=setTimeout(()=>{
-                                        reconnectTimer=null;
-                                        if(currentState===PlayerState.RECONNECTING) scheduleReconnect('media');
-                                    }, 3500);
-                                }catch(e){ scheduleReconnect('media'); }
-                            } else { scheduleReconnect('media'); }
-                            break;
-                        default:
-                            pLog('[HLS] fatal unknown', data);
-                            // son varyantta hata → harici oynatıcı öner
-                            if(hasNextVariant()){
-                                tryNextVariant('hls-unknown');
+                } catch (e) {
+                    pWarn('[RECONNECT] hls operasyonu başarısız:', e);
+                }
+                if (hasNextVariant() && reconnectAttempts >= 2) {
+                    tryVariantOrFail(currentVariantIndex + 1);
+                    return;
+                }
+                const url = activeStreamUrl;
+                destroyHls(false);
+                initHlsPlayer(url, currentVariantIndex);
+            } else if (mpegtsInstance) {
+                pLog('[RECONNECT] mpegts yeniden yükle');
+                try { mpegtsInstance.unload(); } catch (e) {}
+                try { mpegtsInstance.load(); } catch (e) {}
+                videoEl.play().catch(() => {});
+                setTimeout(() => {
+                    if (currentState === PlayerState.RECONNECTING || currentState === PlayerState.BUFFERING) {
+                        if (hasNextVariant()) {
+                            tryVariantOrFail(currentVariantIndex + 1);
+                        } else {
+                            destroyHls(false);
+                            initMpegtsPlayer(activeStreamUrl, currentVariantIndex);
+                        }
+                    }
+                }, 4000);
+            } else {
+                pLog('[RECONNECT] native yeniden yükle:', activeStreamUrl);
+                if (videoEl.src && activeStreamUrl) {
+                    if (hasNextVariant() && reconnectAttempts > 1) {
+                        tryVariantOrFail(currentVariantIndex + 1);
+                        return;
+                    }
+                    videoEl.load();
+                    videoEl.play().catch(() => {});
+                    setTimeout(() => {
+                        if (videoEl.readyState === 0) {
+                            if (hasNextVariant()) {
+                                tryVariantOrFail(currentVariantIndex + 1);
                             } else {
-                                showError('Yayın oynatılamıyor','Beklenmeyen oynatıcı hatası. Harici Wuffy/Just Player ile deneyin.', true);
                                 destroyHls(false);
+                                initNativeAny(activeStreamUrl, currentVariantIndex);
                             }
-                            break;
-                    }
-                });
-
-                hlsInstance.loadSource(url);
-                hlsInstance.attachMedia(videoEl);
-
-            } else if(isNativeHlsSupported()){
-                startNativeHls(url);
-            } else {
-                showError('Tarayıcınız desteklemiyor','Cihazınız HLS yayınlarını desteklemiyor. Lütfen Wuffy veya Just Player ile deneyin.', false);
-                pWarn('No HLS support');
-            }
-        }
-        // Legacy wrapper — eski çağrılar için (url string) — uyumluluk korundu
-        function createAndStart(url, isInitial=true){
-            if(!isPlayerOpen) return;
-            // Eğer streamUrlVariants oluşturulmuş ve url bu varyantlardan biriyse, doğrudan o index'i kullan
-            // Aksi takdirde yeni varyantlar oluştur ve ilkini başlat (retry logic için)
-            if(streamUrlVariants.length && streamUrlVariants.some(v=> v.url===formatStreamUrl(url) || v.url===url)){
-                const idx = streamUrlVariants.findIndex(v=> v.url===formatStreamUrl(url) || v.url===url);
-                if(idx>=0){ createAndStartForVariant(idx); return; }
-            }
-            // Varsayılan: direkt url ile HLS/MPEGTS başlat (fallback path)
-            // Basit mod: tipine göre karar ver
-            if(isTsUrl(url) && window.mpegts && window.mpegts.isSupported()){
-                // TS url direkt — mpegts dene
-                streamUrlVariants = buildStreamVariants(url);
-                currentVariantIndex = streamUrlVariants.findIndex(v=> v.url===url);
-                if(currentVariantIndex<0) currentVariantIndex=0;
-                createAndStartForVariant(currentVariantIndex);
-                return;
-            }
-            // HLS path — eski davranış korunuyor
-            const finalUrl = formatStreamUrl(url);
-            activeStreamUrl = finalUrl;
-            pLog('[START][LEGACY] createAndStart', finalUrl, 'initial', isInitial);
-            if(Hls.isSupported()){
-                // inline HLS minimal (fallback için) — esas yol createAndStartForVariant
-                const cfg = getHlsConfig();
-                hlsInstance = new Hls(cfg);
-                window._hls = hlsInstance;
-                hlsInstance.on(Hls.Events.MANIFEST_PARSED, ()=>{ hideError(); videoEl.play().catch(e=>{ if(e && e.name==='NotAllowedError') showAutoplayBlock(); }); });
-                hlsInstance.on(Hls.Events.ERROR, (evt,data)=>{
-                    if(data.fatal){
-                        if(hasNextVariant()){ tryNextVariant('legacy-'+data.details); }
-                        else scheduleReconnect(data.type===Hls.ErrorTypes.NETWORK_ERROR?'network':'media');
-                    }
-                });
-                hlsInstance.loadSource(finalUrl);
-                hlsInstance.attachMedia(videoEl);
-            } else if(isNativeHlsSupported()){
-                startNativeHls(finalUrl);
-            } else {
-                showError('Tarayıcınız desteklemiyor','Cihazınız HLS yayınlarını desteklemiyor.', false);
+                        }
+                    }, 3000);
+                }
             }
         }
 
-        /* ---- video element events ---- */
-        function setupVideoEvents(){
-            videoEl.addEventListener('loadstart', ()=>{
-                pLog('[VIDEO] loadstart');
-                if(currentState!==PlayerState.RECONNECTING) setPlayerState(PlayerState.LOADING);
-                showLoading('Bağlantı kuruluyor...','Yayın hazırlanıyor');
-                showControls();
-            });
-            videoEl.addEventListener('waiting', ()=>{
-                pLog('[VIDEO] waiting');
-                if(currentState===PlayerState.PLAYING || currentState===PlayerState.LOADING) {
-                    setPlayerState(PlayerState.BUFFERING);
-                    showLoading('Ara bellek dolduruluyor...','');
-                    showControls();
+        function resetReconnectOnSuccess() {
+            if (reconnectAttempts > 0) {
+                pLog('[RECONNECT] denemeler sıfırlandı (önce:', reconnectAttempts, ')');
+            }
+            reconnectAttempts = 0;
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+
+        /* ===== TEMİZLE ===== */
+        function clearAllTimers() {
+            if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+            if (controlsHideTimer) { clearTimeout(controlsHideTimer); controlsHideTimer = null; }
+            if (stallMonitorTimer) { clearInterval(stallMonitorTimer); stallMonitorTimer = null; }
+            if (progressMonitorTimer) { clearInterval(progressMonitorTimer); progressMonitorTimer = null; }
+        }
+
+        function destroyHls(fullCleanup) {
+            clearAllTimers();
+            if (hlsInstance) {
+                try {
+                    pLog('[HLS] destroy');
+                    hlsInstance.destroy();
+                } catch (e) {
+                    pWarn('hls destroy hatası:', e);
                 }
-            });
-            videoEl.addEventListener('stalled', ()=>{
-                pLog('[VIDEO] stalled');
-                // will be caught by stall monitor
-                if(currentState===PlayerState.PLAYING) setPlayerState(PlayerState.BUFFERING);
-            });
-            videoEl.addEventListener('canplay', ()=>{
-                pLog('[VIDEO] canplay readyState', videoEl.readyState);
-                hasReceivedCanPlay=true;
-                hideError();
-                // don't hide loading yet until playing
-                if(currentState===PlayerState.LOADING || currentState===PlayerState.CONNECTING || currentState===PlayerState.BUFFERING){
-                    // show controls
-                    showControls();
+                hlsInstance = null;
+            }
+            if (mpegtsInstance) {
+                try {
+                    pLog('[MPEGTS] destroy');
+                    try { mpegtsInstance.pause(); } catch (e) {}
+                    try { mpegtsInstance.unload(); } catch (e) {}
+                    try { mpegtsInstance.detachMediaElement(); } catch (e) {}
+                    try { mpegtsInstance.destroy(); } catch (e) {}
+                } catch (e) {
+                    pWarn('mpegts destroy hatası:', e);
                 }
-            });
-            videoEl.addEventListener('playing', ()=>{
-                pLog('[VIDEO] playing');
+                mpegtsInstance = null;
+            }
+            if (fullCleanup) {
+                try {
+                    videoEl.pause();
+                    videoEl.removeAttribute('src');
+                    videoEl.load();
+                } catch (e) {}
                 hideLoading();
                 hideError();
                 hideAutoplayBlock();
-                setPlayerState(PlayerState.PLAYING);
-                resetReconnectOnSuccess();
-                showControls();
-                scheduleHideControls();
-                lastCurrentTime = videoEl.currentTime;
-                lastTimeUpdateAt = Date.now();
-            });
-            videoEl.addEventListener('pause', ()=>{
-                pLog('[VIDEO] pause');
-                if(isPlayerOpen && currentState!==PlayerState.ERROR && currentState!==PlayerState.DESTROYED){
-                    // if pause was user-initiated vs buffering? check
-                    if(!videoEl.ended && videoEl.readyState>=2){
-                        setPlayerState(PlayerState.PAUSED);
-                        centerPlayBtn.classList.remove('hidden');
-                        centerPlayBtn.innerHTML='<i class="fas fa-play"></i>';
-                        showControls();
+                progressPlayed.style.width = '0%';
+                progressBuffer.style.width = '0%';
+                progressHandle.style.left = '0%';
+                timeDisplay.textContent = 'CANLI';
+                liveBtn.classList.add('live');
+                playerLiveBadgeInline.classList.remove('show');
+            }
+            hasPlayedOnce = false;
+        }
+
+        function cleanupPlayer(fullCleanup) {
+            isPlayerOpen = false;
+            destroyHls(fullCleanup);
+            setPlayerState(PlayerState.DESTROYED);
+        }
+
+        /* ===== TAMPONLAMA VE İLERLEME ===== */
+        function startStallMonitor() {
+            if (stallMonitorTimer) clearInterval(stallMonitorTimer);
+            lastPosition = videoEl.currentTime || 0;
+            lastPositionCheckTime = Date.now();
+            stallMonitorTimer = setInterval(() => {
+                if (!isPlayerOpen) return;
+                if (currentState !== PlayerState.PLAYING &&
+                    currentState !== PlayerState.BUFFERING &&
+                    currentState !== PlayerState.RECONNECTING) return;
+                if (videoEl.paused) return;
+                const now = Date.now();
+                const current = videoEl.currentTime;
+                const deltaTime = now - lastPositionCheckTime;
+                const deltaPos = Math.abs(current - lastPosition);
+                if (deltaPos > 0.15) {
+                    lastPosition = current;
+                    lastPositionCheckTime = now;
+                    if (currentState === PlayerState.BUFFERING) {
+                        pLog('[STALL] toparlandı, pozisyon ilerliyor');
+                        setPlayerState(PlayerState.PLAYING);
+                        hideLoading();
+                        resetReconnectOnSuccess();
                     }
-                }
-            });
-            videoEl.addEventListener('timeupdate', ()=>{
-                lastCurrentTime = videoEl.currentTime;
-                lastTimeUpdateAt = Date.now();
-                // if we were reconnecting and now time moves, consider recovered
-                if(currentState===PlayerState.RECONNECTING || currentState===PlayerState.BUFFERING){
-                    // wait a bit to ensure stable
-                    if(videoEl.currentTime>0 && !videoEl.paused){
-                        // debounce
-                        clearTimeout(videoEl._recoverTimer);
-                        videoEl._recoverTimer = setTimeout(()=>{
-                            if(currentState===PlayerState.RECONNECTING || currentState===PlayerState.BUFFERING){
-                                hideLoading();
-                                setPlayerState(PlayerState.PLAYING);
-                                resetReconnectOnSuccess();
-                            }
-                        }, 700);
-                    }
-                }
-                // update progress live? via interval, but also here
-                // throttle via not every event? keep interval
-            });
-            videoEl.addEventListener('progress', ()=>{
-                // buffer update will be done via interval
-            });
-            videoEl.addEventListener('durationchange', ()=>{
-                pLog('[VIDEO] durationchange', videoEl.duration);
-            });
-            videoEl.addEventListener('error', ()=>{
-                const err = videoEl.error;
-                pWarn('[VIDEO] error', err, 'active', activeStreamUrl, 'variants', streamUrlVariants, 'idx', currentVariantIndex);
-                if(!isPlayerOpen) return;
-                // Titan TS + HLS fallback: video error'da diğer varyantı dene
-                if(hasNextVariant()){
-                    pLog('[VIDEO] error → fallback to next variant');
-                    tryNextVariant('video-error-'+(err?err.code:'unknown'));
                     return;
                 }
-                // mpegts instance varsa onun error'u zaten handle edildi; burada hls dışı native error
-                if(!hlsInstance && !mpegtsInstance){
-                    let msg='Video yüklenemedi.';
-                    if(err){
-                        if(err.code===2) msg='Ağ hatası — yayın kesildi. Titan linki için harici oynatıcı da deneyebilirsiniz.';
-                        if(err.code===3) msg='Kod çözme hatası — yayın formatı bu tarayıcıda desteklenmiyor. Wuffy/Just Player deneyin.';
-                        if(err.code===4) msg='Kaynak bulunamadı veya desteklenmiyor (CORS kaynaklı olabilir).';
-                    }
-                    // Son varyanttayız, external öner
-                    if(streamUrlVariants.length>1){
-                        msg += ' Alternatif kaynaklar da denendi.';
-                    }
-                    showError('Yayın oynatılamıyor', msg + ' Harici oynatıcı seçenekleri mevcut.', true);
-                } else if(hlsInstance || mpegtsInstance){
-                    // hls/mpegts error zaten HLS/MPEGTS eventlerinde handle edildi; burada ek olarak bir kez daha dene
-                    if(currentState!==PlayerState.RECONNECTING && currentState!==PlayerState.ERROR){
-                        scheduleReconnect('network');
-                    }
-                } else {
-                    if(currentState!==PlayerState.RECONNECTING && currentState!==PlayerState.ERROR){
-                        scheduleReconnect('network');
+                if (deltaTime > PlayerCfg.stallThresholdMs) {
+                    pWarn('[STALL] algılandı, deltaTime:', deltaTime, 'cur:', current);
+                    if (currentState !== PlayerState.RECONNECTING) {
+                        setPlayerState(PlayerState.BUFFERING);
+                        showLoading('Yayın takıldı, toparlanıyor...', 'Ağ kontrol ediliyor');
+                        scheduleReconnect('stall');
                     }
                 }
-            });
-            videoEl.addEventListener('ended', ()=>{
-                pLog('[VIDEO] ended');
-                // live shouldn't end; if it does, show error
-                if(isLiveStream()){
-                    showError('Yayın sona erdi','Canlı yayın sonlandı veya geçici olarak durduruldu.', true);
-                }
-            });
-            videoEl.addEventListener('volumechange', ()=>{
-                updateVolumeUI();
-            });
-            videoEl.addEventListener('enterpictureinpicture', ()=>{
-                pLog('[VIDEO] enter PiP');
-                showNotification('Resim içinde resim aktif','external-link-alt',2000);
-            });
-            videoEl.addEventListener('leavepictureinpicture', ()=>{
-                pLog('[VIDEO] leave PiP');
-            });
+            }, PlayerCfg.stallCheckIntervalMs);
         }
-        setupVideoEvents();
 
-        /* ---- controls interactions ---- */
-        function updateVolumeUI(){
-            const vol = videoEl.muted ? 0 : videoEl.volume;
-            volumeBar.value = Math.round(vol*100);
-            if(videoEl.muted || vol===0){
-                muteBtn.innerHTML='<i class="fas fa-volume-mute"></i>';
-                muteBtn.setAttribute('aria-label','Sesi aç');
-            } else if(vol<0.5){
-                muteBtn.innerHTML='<i class="fas fa-volume-down"></i>';
-                muteBtn.setAttribute('aria-label','Sesi kapat');
-            } else {
-                muteBtn.innerHTML='<i class="fas fa-volume-up"></i>';
-                muteBtn.setAttribute('aria-label','Sesi kapat');
+        function startProgressMonitor() {
+            if (progressMonitorTimer) clearInterval(progressMonitorTimer);
+            progressMonitorTimer = setInterval(() => {
+                if (!isPlayerOpen) return;
+                updateProgress();
+                updateLiveLatency();
+            }, PlayerCfg.progressUpdateIntervalMs);
+        }
+
+        function updateProgress() {
+            const v = videoEl;
+            try {
+                if (v.buffered && v.buffered.length) {
+                    const bufferedEnd = v.buffered.end(v.buffered.length - 1);
+                    let duration = v.duration;
+                    let start = 0, end = duration;
+                    if (v.seekable && v.seekable.length) {
+                        start = v.seekable.start(0);
+                        end = v.seekable.end(v.seekable.length - 1);
+                        duration = end - start;
+                    }
+                    if (duration && isFinite(duration) && duration > 0) {
+                        const curFromStart = v.currentTime - start;
+                        const bufFromStart = bufferedEnd - start;
+                        const playedPct = Math.max(0, Math.min(100, (curFromStart / duration) * 100));
+                        const bufPct = Math.max(0, Math.min(100, (bufFromStart / duration) * 100));
+                        progressPlayed.style.width = playedPct + '%';
+                        progressBuffer.style.width = bufPct + '%';
+                        progressHandle.style.left = playedPct + '%';
+                        seekBar.value = playedPct;
+                        seekBar.setAttribute('aria-valuenow', Math.round(playedPct));
+                        if (isLiveStream()) {
+                            timeDisplay.textContent = 'CANLI';
+                        } else {
+                            const curStr = formatTime(v.currentTime);
+                            const durStr = isFinite(v.duration) ? formatTime(v.duration) : 'CANLI';
+                            timeDisplay.textContent = `${curStr} / ${durStr}`;
+                        }
+                        return;
+                    }
+                }
+            } catch (e) {}
+            // fallback
+            if (isLiveStream()) {
+                const latency = getLiveLatency();
+                let pct = 92;
+                if (latency !== null) {
+                    if (latency > 30) pct = 70;
+                    else if (latency > 15) pct = 82;
+                }
+                progressPlayed.style.width = pct + '%';
+                progressBuffer.style.width = Math.min(100, pct + 6) + '%';
+                progressHandle.style.left = pct + '%';
+                timeDisplay.textContent = 'CANLI';
             }
         }
-        // play/pause
-        function togglePlayPause(){
-            if(videoEl.paused){
+
+        function formatTime(s) {
+            if (!isFinite(s) || s < 0) return '00:00';
+            s = Math.floor(s);
+            const m = Math.floor(s / 60);
+            const sec = s % 60;
+            return (m < 10 ? '0' : '') + m + ':' + (sec < 10 ? '0' : '') + sec;
+        }
+
+        function isLiveStream() {
+            if (!isFinite(videoEl.duration) || videoEl.duration === Infinity) return true;
+            return true; // IPTV için her zaman canlı
+        }
+
+        function getLiveLatency() {
+            try {
+                if (videoEl.seekable && videoEl.seekable.length) {
+                    const liveEdge = videoEl.seekable.end(videoEl.seekable.length - 1);
+                    return Math.max(0, liveEdge - videoEl.currentTime);
+                }
+            } catch (e) {}
+            return null;
+        }
+
+        function updateLiveLatency() {
+            const latency = getLiveLatency();
+            const threshold = PlayerCfg.liveLatencyThresholdSec;
+            if (latency === null) {
+                liveBtn.classList.add('live');
+                playerLiveBadgeInline.classList.add('show');
+                liveBtn.title = 'Canlı yayın';
+                return;
+            }
+            if (latency <= threshold + 2) {
+                liveBtn.classList.add('live');
+                playerLiveBadgeInline.classList.add('show');
+                liveBtn.title = 'Canlı yayın';
+            } else {
+                liveBtn.classList.remove('live');
+                playerLiveBadgeInline.classList.remove('show');
+                liveBtn.title = 'Canlı yayına dön (' + Math.round(latency) + 'sn geri)';
+            }
+            if (latency > threshold) {
+                timeDisplay.textContent = `CANLI • -${Math.round(latency)}sn`;
+            } else {
+                timeDisplay.textContent = `CANLI`;
+            }
+        }
+
+        function seekToLive() {
+            try {
+                if (videoEl.seekable && videoEl.seekable.length) {
+                    const liveEdge = videoEl.seekable.end(videoEl.seekable.length - 1);
+                    const target = Math.max(0, liveEdge - 1.2);
+                    pLog('[LIVE] canlıya dön:', liveEdge, '->', target);
+                    videoEl.currentTime = target;
+                    showLoading('Canlı yayına geçiliyor...');
+                    setTimeout(() => hideLoading(), 900);
+                    showControls();
+                } else if (hlsInstance && hlsInstance.liveSyncPosition) {
+                    const pos = hlsInstance.liveSyncPosition;
+                    if (pos) videoEl.currentTime = pos;
+                } else {
+                    showNotification('Canlı konuma geçilemedi', 'info-circle', 2000);
+                }
+                liveBtn.classList.add('live');
+            } catch (e) {
+                pWarn('seekToLive hatası:', e);
+                showNotification('Canlı yayına geçilemedi', 'exclamation-triangle', 2000);
+            }
+        }
+
+        /* ===== KONTROL Etkileşim ===== */
+        function updateVolumeUI() {
+            const vol = videoEl.muted ? 0 : videoEl.volume;
+            volumeBar.value = Math.round(vol * 100);
+            if (videoEl.muted || vol === 0) {
+                muteBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
+                muteBtn.setAttribute('aria-label', 'Sesi aç');
+            } else if (vol < 0.5) {
+                muteBtn.innerHTML = '<i class="fas fa-volume-down"></i>';
+                muteBtn.setAttribute('aria-label', 'Sesi kapat');
+            } else {
+                muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                muteBtn.setAttribute('aria-label', 'Sesi kapat');
+            }
+        }
+
+        // Oynatma/durdurma
+        function togglePlayPause() {
+            if (videoEl.paused) {
                 const p = videoEl.play();
-                if(p && p.catch) p.catch(err=>{
-                    pWarn('play() blocked', err);
-                    if(err && err.name==='NotAllowedError') showAutoplayBlock();
-                    else showNotification('Oynatma başlatılamadı','exclamation-triangle',2500);
+                if (p && p.catch) p.catch(err => {
+                    pWarn('play() engellendi:', err);
+                    if (err && err.name === 'NotAllowedError') showAutoplayBlock();
+                    else showNotification('Oynatma başlatılamadı', 'exclamation-triangle', 2500);
                 });
                 showControls();
             } else {
@@ -1966,162 +1893,275 @@
         }
         centerPlayBtn.addEventListener('click', togglePlayPause);
         playPauseBtn.addEventListener('click', togglePlayPause);
-        // mute
-        muteBtn.addEventListener('click', ()=>{
+
+        // Ses
+        muteBtn.addEventListener('click', () => {
             videoEl.muted = !videoEl.muted;
-            if(!videoEl.muted && videoEl.volume===0) videoEl.volume=0.6;
+            if (!videoEl.muted && videoEl.volume === 0) videoEl.volume = 0.6;
             updateVolumeUI();
             showControls();
         });
-        volumeBar.addEventListener('input', (e)=>{
-            const v = parseInt(e.target.value,10)/100;
+        volumeBar.addEventListener('input', (e) => {
+            const v = parseInt(e.target.value, 10) / 100;
             videoEl.volume = v;
-            videoEl.muted = v===0;
+            videoEl.muted = v === 0;
             updateVolumeUI();
             showControls();
         });
-        // pip
-        pipBtn.addEventListener('click', async ()=>{
-            try{
-                if(document.pictureInPictureElement){
+
+        // PIP
+        pipBtn.addEventListener('click', async () => {
+            try {
+                if (document.pictureInPictureElement) {
                     await document.exitPictureInPicture();
-                } else if(document.pictureInPictureEnabled && videoEl.requestPictureInPicture){
+                } else if (document.pictureInPictureEnabled && videoEl.requestPictureInPicture) {
                     await videoEl.requestPictureInPicture();
                 } else {
-                    showNotification('PIP bu cihazda desteklenmiyor','info-circle',2000);
+                    showNotification('PIP bu cihazda desteklenmiyor', 'info-circle', 2000);
                 }
-            }catch(e){
-                pWarn('PIP err', e);
-                showNotification('PIP açılamadı','exclamation-triangle',2000);
+            } catch (e) {
+                pWarn('PIP hatası:', e);
+                showNotification('PIP açılamadı', 'exclamation-triangle', 2000);
             }
             showControls();
         });
-        // fullscreen
-        fullscreenBtn.addEventListener('click', ()=>{
-            try{
-                if(document.fullscreenElement){
+
+        // Tam ekran
+        fullscreenBtn.addEventListener('click', () => {
+            try {
+                if (document.fullscreenElement) {
                     document.exitFullscreen();
-                } else if(playerContainer.requestFullscreen){
+                } else if (playerContainer.requestFullscreen) {
                     playerContainer.requestFullscreen();
-                } else if(videoEl.requestFullscreen){
+                } else if (videoEl.requestFullscreen) {
                     videoEl.requestFullscreen();
-                } else if(videoEl.webkitEnterFullscreen){
+                } else if (videoEl.webkitEnterFullscreen) {
                     videoEl.webkitEnterFullscreen();
                 }
-            }catch(e){ pWarn('fullscreen err', e); }
+            } catch (e) { pWarn('tam ekran hatası:', e); }
             showControls();
         });
-        document.addEventListener('fullscreenchange', ()=>{
+        document.addEventListener('fullscreenchange', () => {
             const isFs = !!document.fullscreenElement;
             fullscreenBtn.innerHTML = isFs ? '<i class="fas fa-compress"></i>' : '<i class="fas fa-expand"></i>';
         });
-        // live button
-        liveBtn.addEventListener('click', ()=>{
+
+        // Canlı buton
+        liveBtn.addEventListener('click', () => {
             seekToLive();
             showControls();
         });
-        // progress seek (careful for live)
-        let wasPlayingBeforeSeek=false;
-        seekBar.addEventListener('input', (e)=>{
-            if(isLiveStream()){
-                // live: prevent seeking, show info once
-                e.target.value = progressPlayed.style.width.replace('%','') || 0;
-                if(!seekBar._liveToastAt || Date.now()-seekBar._liveToastAt>2500){
-                    showNotification('Canlı yayında ileri/geri sarma devre dışı','info-circle',2000);
-                    seekBar._liveToastAt=Date.now();
+
+        // İlerleme çubuğu (canlı göstergesi)
+        seekBar.addEventListener('input', (e) => {
+            if (isLiveStream()) {
+                e.target.value = progressPlayed.style.width.replace('%', '') || 0;
+                if (!seekBar._liveToastAt || Date.now() - seekBar._liveToastAt > 2500) {
+                    showNotification('Canlı yayında ileri/geri sarma devre dışı', 'info-circle', 2000);
+                    seekBar._liveToastAt = Date.now();
                 }
                 return;
             }
-            // VOD seeking
-            const pct = parseInt(e.target.value,10);
+            const pct = parseInt(e.target.value, 10);
             const duration = videoEl.duration;
-            if(isFinite(duration)){
-                const newTime = (pct/100)*duration;
-                progressPlayed.style.width = pct+'%';
-                progressHandle.style.left = pct+'%';
-                // don't seek until change committed? but live preview
+            if (isFinite(duration)) {
+                const newTime = (pct / 100) * duration;
+                progressPlayed.style.width = pct + '%';
+                progressHandle.style.left = pct + '%';
             }
         });
-        seekBar.addEventListener('change', (e)=>{
-            if(isLiveStream()) return;
-            const pct = parseInt(e.target.value,10);
+        seekBar.addEventListener('change', (e) => {
+            if (isLiveStream()) return;
+            const pct = parseInt(e.target.value, 10);
             const duration = videoEl.duration;
-            if(isFinite(duration)){
-                const newTime = (pct/100)*duration;
-                try{ videoEl.currentTime = newTime; }catch(err){}
+            if (isFinite(duration)) {
+                const newTime = (pct / 100) * duration;
+                try { videoEl.currentTime = newTime; } catch (err) {}
                 showControls();
             }
         });
-        progressWrap.addEventListener('click', (e)=>{
-            if(isLiveStream()){
-                // allow click to still show toast, but not seek
-                if(!progressWrap._toastAt || Date.now()-progressWrap._toastAt>2500){
-                    showNotification('Canlı yayında zaman çubuğu devre dışı','info-circle',2000);
-                    progressWrap._toastAt=Date.now();
+        progressWrap.addEventListener('click', (e) => {
+            if (isLiveStream()) {
+                if (!progressWrap._toastAt || Date.now() - progressWrap._toastAt > 2500) {
+                    showNotification('Canlı yayında zaman çubuğu devre dışı', 'info-circle', 2000);
+                    progressWrap._toastAt = Date.now();
                 }
                 return;
             }
             const rect = progressWrap.getBoundingClientRect();
             const x = e.clientX - rect.left;
-            const pct = (x / rect.width)*100;
+            const pct = (x / rect.width) * 100;
             seekBar.value = pct;
             const duration = videoEl.duration;
-            if(isFinite(duration)){
-                videoEl.currentTime = (pct/100)*duration;
-                progressPlayed.style.width = pct+'%';
-                progressHandle.style.left = pct+'%';
+            if (isFinite(duration)) {
+                videoEl.currentTime = (pct / 100) * duration;
+                progressPlayed.style.width = pct + '%';
+                progressHandle.style.left = pct + '%';
                 showControls();
             }
         });
-        // drag handling for progress? keep simple
 
-        // retry — Titan TS/HLS varyantları sıfırdan dener
-        retryBtn.addEventListener('click', ()=>{
+        // Tekrar dene
+        retryBtn.addEventListener('click', () => {
             hideError();
-            reconnectAttempts=0;
-            showLoading('Yeniden bağlanılıyor...','');
+            reconnectAttempts = 0;
+            strategyFailCount = 0;
+            showLoading('Yeniden bağlanılıyor...');
             setPlayerState(PlayerState.CONNECTING);
-            if(originalStreamUrl){
-                streamUrlVariants = buildStreamVariants(originalStreamUrl);
+            if (originalStreamUrl) {
+                variants = streamDetector.buildVariants(originalStreamUrl);
                 currentVariantIndex = 0;
                 destroyHls(false);
-                createAndStartForVariant(0);
-            } else if(activeStreamUrl){
+                attemptVariant(0);
+            } else if (activeStreamUrl) {
                 destroyHls(false);
-                createAndStart(activeStreamUrl, false);
-            } else if(window.currentUrl){
+                attemptVariant(currentVariantIndex);
+            } else if (window.currentUrl) {
                 startPlayback(window.currentUrl, window.currentName);
             }
             showControls();
         });
-        autoplayBtn.addEventListener('click', ()=>{
+        autoplayBtn.addEventListener('click', () => {
             hideAutoplayBlock();
             const p = videoEl.play();
-            if(p && p.catch) p.catch(err=>{
-                pWarn('autoplayBtn play failed', err);
-                showNotification('Oynatma başlatılamadı','exclamation-triangle',2500);
+            if (p && p.catch) p.catch(err => {
+                pWarn('autoplayBtn play başarısız:', err);
+                showNotification('Oynatma başlatılamadı', 'exclamation-triangle', 2500);
             });
             showControls();
         });
 
-        /* ---- player open/close ---- */
-        function startPlayback(url, name){
-            if(!url) return;
+        /* ===== VİDEO OLAYLARI ===== */
+        videoEl.addEventListener('loadstart', () => {
+            pLog('[VIDEO] loadstart');
+            if (currentState !== PlayerState.RECONNECTING) setPlayerState(PlayerState.LOADING);
+            showLoading('Bağlantı kuruluyor...', 'Yayın hazırlanıyor');
+            showControls();
+        });
+        videoEl.addEventListener('waiting', () => {
+            pLog('[VIDEO] waiting');
+            if (currentState === PlayerState.PLAYING || currentState === PlayerState.LOADING) {
+                setPlayerState(PlayerState.BUFFERING);
+                showLoading('Tampon bellek dolduruluyor...');
+                showControls();
+            }
+        });
+        videoEl.addEventListener('stalled', () => {
+            pLog('[VIDEO] stalled');
+            if (currentState === PlayerState.PLAYING) setPlayerState(PlayerState.BUFFERING);
+        });
+        videoEl.addEventListener('canplay', () => {
+            pLog('[VIDEO] canplay, readyState:', videoEl.readyState);
+            if (currentState === PlayerState.LOADING || currentState === PlayerState.CONNECTING || currentState === PlayerState.BUFFERING) {
+                showControls();
+            }
+        });
+        videoEl.addEventListener('playing', () => {
+            pLog('[VIDEO] playing');
+            hideLoading();
+            hideError();
+            hideAutoplayBlock();
+            setPlayerState(PlayerState.PLAYING);
+            resetReconnectOnSuccess();
+            showControls();
+            scheduleHideControls();
+            lastPosition = videoEl.currentTime;
+            lastPositionCheckTime = Date.now();
+            hasPlayedOnce = true;
+        });
+        videoEl.addEventListener('pause', () => {
+            pLog('[VIDEO] pause');
+            if (isPlayerOpen && currentState !== PlayerState.ERROR && currentState !== PlayerState.DESTROYED) {
+                if (!videoEl.ended && videoEl.readyState >= 2) {
+                    setPlayerState(PlayerState.PAUSED);
+                    centerPlayBtn.classList.remove('hidden');
+                    centerPlayBtn.innerHTML = '<i class="fas fa-play"></i>';
+                    showControls();
+                }
+            }
+        });
+        videoEl.addEventListener('timeupdate', () => {
+            lastPosition = videoEl.currentTime;
+            lastPositionCheckTime = Date.now();
+            if (currentState === PlayerState.RECONNECTING || currentState === PlayerState.BUFFERING) {
+                if (videoEl.currentTime > 0 && !videoEl.paused) {
+                    clearTimeout(videoEl._recoverTimer);
+                    videoEl._recoverTimer = setTimeout(() => {
+                        if (currentState === PlayerState.RECONNECTING || currentState === PlayerState.BUFFERING) {
+                            hideLoading();
+                            setPlayerState(PlayerState.PLAYING);
+                            resetReconnectOnSuccess();
+                        }
+                    }, 700);
+                }
+            }
+        });
+        videoEl.addEventListener('durationchange', () => {
+            pLog('[VIDEO] durationchange:', videoEl.duration);
+        });
+        videoEl.addEventListener('error', () => {
+            const err = videoEl.error;
+            pWarn('[VIDEO] error:', err, 'activeStreamUrl:', activeStreamUrl, 'variantIndex:', currentVariantIndex);
+            if (!isPlayerOpen) return;
+            if (hasNextVariant()) {
+                pLog('[VIDEO] error -> diğer varyantı dene');
+                tryVariantOrFail(currentVariantIndex + 1);
+                return;
+            }
+            if (!hlsInstance && !mpegtsInstance) {
+                let msg = 'Video yüklenemedi.';
+                if (err) {
+                    if (err.code === 2) msg = 'Ağ hatası — yayın kesildi. Titan linki için harici oynatıcı da deneyebilirsiniz.';
+                    if (err.code === 3) msg = 'Kod çözme hatası — yayın formatı bu tarayıcıda desteklenmiyor. Wuffy/Just Player deneyin.';
+                    if (err.code === 4) msg = 'Kaynak bulunamadı veya desteklenmiyor (CORS kaynaklı olabilir).';
+                }
+                if (variants.length > 1) {
+                    msg += ' Alternatif kaynaklar da denendi.';
+                }
+                showError('Yayın oynatılamıyor', msg + ' Harici oynatıcı seçenekleri mevcut.', true);
+            } else if (hlsInstance || mpegtsInstance) {
+                if (currentState !== PlayerState.RECONNECTING && currentState !== PlayerState.ERROR) {
+                    scheduleReconnect('network');
+                }
+            } else {
+                if (currentState !== PlayerState.RECONNECTING && currentState !== PlayerState.ERROR) {
+                    scheduleReconnect('network');
+                }
+            }
+        });
+        videoEl.addEventListener('ended', () => {
+            pLog('[VIDEO] ended');
+            if (isLiveStream()) {
+                showError('Yayın sona erdi', 'Canlı yayın sonlandı veya geçici olarak durduruldu.', true);
+            }
+        });
+        videoEl.addEventListener('volumechange', () => {
+            updateVolumeUI();
+        });
+        videoEl.addEventListener('enterpictureinpicture', () => {
+            pLog('[VIDEO] PiP aktif');
+            showNotification('Resim içinde resim aktif', 'external-link-alt', 2000);
+        });
+        videoEl.addEventListener('leavepictureinpicture', () => {
+            pLog('[VIDEO] PiP terk ediliyor');
+        });
+
+        /* ===== OYUNCU AÇ/GİZLE ===== */
+        function openPlayer(url, name) {
+            if (!url) return;
             isPlayerOpen = true;
             activeStreamName = name || 'Canlı Yayın';
             originalStreamUrl = url;
             playerStreamTitle.textContent = activeStreamName;
             playerContainer.classList.add('active');
-            playerContainer.style.display='flex';
-            document.body.style.overflow='hidden';
-            // reset state
+            playerContainer.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
             hideError();
             hideAutoplayBlock();
-            // Titan gibi TS linkler için HLS ve TS varyantlarını oluştur
-            streamUrlVariants = buildStreamVariants(url);
+            variants = streamDetector.buildVariants(url);
             currentVariantIndex = 0;
-            const first = streamUrlVariants[0];
-            showLoading('Bağlantı kuruluyor...', activeStreamName + (first? ' ('+first.label+')':'' ));
+            const first = variants[0];
+            showLoading('Bağlantı kuruluyor...', activeStreamName + (first ? ' (' + first.label + ')' : ''));
             setPlayerState(PlayerState.CONNECTING);
             showControls();
             destroyHls(false);
@@ -2130,97 +2170,90 @@
             updateVolumeUI();
             startStallMonitor();
             startProgressMonitor();
-            setTimeout(()=> createAndStartForVariant(0), 120);
-            if(!document.pictureInPictureEnabled || !videoEl.requestPictureInPicture){
-                pipBtn.style.display='none';
+            setTimeout(() => attemptVariant(0), 120);
+            if (!document.pictureInPictureEnabled || !videoEl.requestPictureInPicture) {
+                pipBtn.style.display = 'none';
             } else {
-                pipBtn.style.display='flex';
+                pipBtn.style.display = 'flex';
             }
-            setTimeout(()=> closePlayerBtn.focus(), 180);
+            setTimeout(() => closePlayerBtn.focus(), 180);
             scheduleHideControls();
-            // Debug log Titan URL için
-            pLog('[START] Titan/TS URL variants', streamUrlVariants);
+            pLog('[START] URL:', url, 'variants:', variants.length);
         }
-        function closePlayer(){
-            isPlayerOpen=false;
+
+        function closePlayer() {
+            isPlayerOpen = false;
             playerContainer.classList.remove('active');
-            playerContainer.style.display='none';
-            document.body.style.overflow='';
+            playerContainer.style.display = 'none';
+            document.body.style.overflow = '';
             clearAllTimers();
             destroyHls(true);
             setPlayerState(PlayerState.DESTROYED);
-            activeStreamUrl=null;
-            activeStreamName=null;
-            originalStreamUrl=null;
-            streamUrlVariants=[];
-            currentVariantIndex=0;
-            if(document.fullscreenElement) {
-                try{ document.exitFullscreen(); }catch(e){}
+            activeStreamUrl = null;
+            activeStreamName = null;
+            originalStreamUrl = null;
+            variants = [];
+            currentVariantIndex = 0;
+            if (document.fullscreenElement) {
+                try { document.exitFullscreen(); } catch (e) {}
             }
-            if(document.pictureInPictureElement){
-                try{ document.exitPictureInPicture(); }catch(e){}
+            if (document.pictureInPictureElement) {
+                try { document.exitPictureInPicture(); } catch (e) {}
             }
-            // restore focus
-            if(lastFocusedElement && typeof lastFocusedElement.focus==='function'){
-                setTimeout(()=> lastFocusedElement.focus(), 60);
+            if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+                setTimeout(() => lastFocusedElement.focus(), 60);
             }
-            setTimeout(()=> setPlayerState(PlayerState.IDLE), 120);
+            setTimeout(() => setPlayerState(PlayerState.IDLE), 120);
         }
 
-        // container click to toggle controls (but not when clicking buttons)
-        playerContainer.addEventListener('click', (e)=>{
-            // if click on video area (not controls/top bar/center button)
-            if(e.target===playerContainer || e.target===videoEl){
-                if(playerTopBar.classList.contains('hidden')){
+        // Kontainer tıklama - kontrolü göster/gizle
+        playerContainer.addEventListener('click', (e) => {
+            if (e.target === playerContainer || e.target === videoEl) {
+                if (playerTopBar.classList.contains('hidden')) {
                     showControls();
                 } else {
-                    // if playing, hide; if paused, keep
-                    if(currentState===PlayerState.PLAYING) hideControls();
+                    if (currentState === PlayerState.PLAYING) hideControls();
                     else showControls();
                 }
             }
         });
-        playerContainer.addEventListener('mousemove', ()=>{
-            if(!isPlayerOpen) return;
+        playerContainer.addEventListener('mousemove', () => {
+            if (!isPlayerOpen) return;
             showControls();
         });
-        playerContainer.addEventListener('touchstart', ()=>{
-            if(!isPlayerOpen) return;
+        playerContainer.addEventListener('touchstart', () => {
+            if (!isPlayerOpen) return;
             showControls();
-        }, {passive:true});
+        }, { passive: true });
 
-        // Top bar / controls hover keep visible
-        [playerTopBar, playerControls].forEach(el=>{
+        // Üst çubuk/kontrol hover - görünür tut
+        [playerTopBar, playerControls].forEach(el => {
             el.addEventListener('mousemove', showControls);
-            el.addEventListener('touchstart', showControls, {passive:true});
+            el.addEventListener('touchstart', showControls, { passive: true });
         });
 
-        /* ---- external trigger: Dahili player button ---- */
+        /* ===== DIŞ OYNATICI SEÇENEKLERİ ===== */
         document.getElementById('playInBuiltInPlayer').addEventListener('click', () => {
             document.getElementById('playerOptionsModal').style.display = 'none';
             const finalName = window.currentName || 'Canlı Yayın';
             const finalUrl = window.currentUrl;
-            if(!finalUrl){ showNotification('Yayın URL bulunamadı','exclamation-triangle',3000); return; }
+            if (!finalUrl) { showNotification('Yayın URL bulunamadı', 'exclamation-triangle', 3000); return; }
             showNotification(finalName + " oynatılıyor", "play", 2000);
-            startPlayback(finalUrl, finalName);
+            openPlayer(finalUrl, finalName);
         });
 
         document.getElementById('closePlayerBtn').addEventListener('click', closePlayer);
-        // also allow clicking outside? already via container
 
-        /* ---- TV KUMANDASI — GELİŞTİRİLDİ ---- */
+        /* ===== TV KUMANDASI ===== */
         document.addEventListener('keydown', function(e) {
             const key = e.key;
             const code = e.keyCode;
-            const isPlayerActive = isPlayerOpen && playerContainer.style.display==='flex';
+            const isPlayerActive = isPlayerOpen && playerContainer.style.display === 'flex';
 
-            // Modal açıkken Enter davranışı korunuyor — orijinal mantık
             if (key === 'Enter') {
                 if (e.target && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'A') {
-                    // eğer player içindeyse, play/pause yap
-                    if(isPlayerActive){
-                        // focus controls içindeki butonsa, default click yapma
-                        // aksi halde toggle controls/play
+                    if (isPlayerActive) {
+                        // player içindeyse buton tıklaması varsa default'a bırak - yoksa kontrolleri göster/oynat
                     } else {
                         e.preventDefault();
                         e.target.click();
@@ -2228,8 +2261,7 @@
                 }
             }
 
-            if(!isPlayerActive){
-                // player kapalı iken sadece Escape/Back modal kapatma
+            if (!isPlayerActive) {
                 if (key === 'Escape' || key === 'Backspace' || code === 10009) {
                     if (document.getElementById('playerOptionsModal').style.display === 'flex') {
                         e.preventDefault();
@@ -2239,81 +2271,68 @@
                 return;
             }
 
-            // Player açıkken kumanda
-            switch(key){
+            switch (key) {
                 case 'Escape':
                 case 'Backspace':
-                    // keyCode 10009 already via code check below
                     e.preventDefault();
                     closePlayer();
                     break;
                 case 'ArrowUp':
                     e.preventDefault();
-                    // ses aç
-                    videoEl.muted=false;
+                    videoEl.muted = false;
                     videoEl.volume = Math.min(1, videoEl.volume + 0.07);
                     updateVolumeUI();
                     showControls();
-                    showNotification('Ses: %' + Math.round(videoEl.volume*100), 'volume-up', 1200);
+                    showNotification('Ses: %' + Math.round(videoEl.volume * 100), 'volume-up', 1200);
                     break;
                 case 'ArrowDown':
                     e.preventDefault();
                     videoEl.volume = Math.max(0, videoEl.volume - 0.07);
-                    if(videoEl.volume===0) videoEl.muted=true;
-                    else videoEl.muted=false;
+                    if (videoEl.volume === 0) videoEl.muted = true;
+                    else videoEl.muted = false;
                     updateVolumeUI();
                     showControls();
-                    showNotification('Ses: %' + Math.round(videoEl.volume*100), 'volume-down', 1200);
+                    showNotification('Ses: %' + Math.round(videoEl.volume * 100), 'volume-down', 1200);
                     break;
                 case 'ArrowLeft':
                     e.preventDefault();
-                    if(isLiveStream()){
-                        // canlıda sola seek yok, ses kıs gibi davran veya sadece controls göster
-                        // biz sesi kıs olarak yorumlayalım veya toast
-                        // tercih: ses kıs (alternatif: canlı toast)
-                        // Burada ses kıs yap, aynı ArrowDown gibi
-                        // Ama kullanıcıya bilgi ver
-                        if(!e.repeat) showNotification('Canlı yayında geri sarma kapalı','info-circle',1400);
+                    if (isLiveStream()) {
+                        if (!e.repeat) showNotification('Canlı yayında geri sarma kapalı', 'info-circle', 1400);
                         showControls();
                     } else {
-                        // VOD: 10sn geri
-                        try{ videoEl.currentTime = Math.max(0, videoEl.currentTime - 10); }catch(err){}
+                        try { videoEl.currentTime = Math.max(0, videoEl.currentTime - 10); } catch (err) {}
                         showControls();
-                        showNotification('-10 sn','undo',1100);
+                        showNotification('-10 sn', 'undo', 1100);
                     }
                     break;
                 case 'ArrowRight':
                     e.preventDefault();
-                    if(isLiveStream()){
-                        // canlıda ileri sarma yok — eğer gerideyse canlıya dön
+                    if (isLiveStream()) {
                         const lat = getLiveLatency();
-                        if(lat!==null && lat> PlayerCfg.liveLatencyThresholdSec){
+                        if (lat !== null && lat > PlayerCfg.liveLatencyThresholdSec) {
                             seekToLive();
-                            showNotification('Canlı yayına dönüldü','satellite-dish',1400);
+                            showNotification('Canlı yayına dönüldü', 'satellite-dish', 1400);
                         } else {
-                            if(!e.repeat) showNotification('Canlı yayında ileri sarma kapalı','info-circle',1400);
+                            if (!e.repeat) showNotification('Canlı yayında ileri sarma kapalı', 'info-circle', 1400);
                         }
                         showControls();
                     } else {
-                        try{ videoEl.currentTime = Math.min(videoEl.duration-1, videoEl.currentTime + 10); }catch(err){}
+                        try { videoEl.currentTime = Math.min(videoEl.duration - 1, videoEl.currentTime + 10); } catch (err) {}
                         showControls();
-                        showNotification('+10 sn','redo',1100);
+                        showNotification('+10 sn', 'redo', 1100);
                     }
                     break;
                 case 'Enter':
                 case ' ':
                 case 'Spacebar':
-                    // OK tuşu: kontroller gizliyse göster, açıksa play/pause
-                    if(isPlayerActive){
-                        // e.target bir button ise onun click'i zaten tetiklenecek, ekstra toggle yapma
-                        const isButton = e.target && (e.target.tagName==='BUTTON' || e.target.closest('button'));
-                        if(isButton){
-                            // bırak default click çalışsın, sadece controls göster
+                    if (isPlayerActive) {
+                        const isButton = e.target && (e.target.tagName === 'BUTTON' || e.target.closest('button'));
+                        if (isButton) {
                             showControls();
                             break;
                         }
                         e.preventDefault();
-                        if(playerTopBar.classList.contains('hidden')){
+                        if (playerTopBar.classList.contains('hidden')) {
                             showControls();
                         } else {
                             togglePlayPause();
@@ -2330,7 +2349,7 @@
                 case 'm':
                 case 'M':
                     e.preventDefault();
-                    videoEl.muted=!videoEl.muted;
+                    videoEl.muted = !videoEl.muted;
                     updateVolumeUI();
                     showControls();
                     break;
@@ -2340,64 +2359,268 @@
                     fullscreenBtn.click();
                     break;
                 default:
-                    // Back key via keyCode
-                    if(code===10009 || code===461){
+                    if (code === 10009 || code === 461) {
                         e.preventDefault();
                         closePlayer();
                     }
-                    // her tuşta kontrolleri göster
                     showControls();
                     break;
             }
-            // her kumanda etkileşiminde hide timer reset
-            if(isPlayerActive) scheduleHideControls();
+            if (isPlayerActive) scheduleHideControls();
         });
 
-        // Global back/cancel for TV (10009) via keydown already, also add extra listener for keyup some TVs fire keyup
-        document.addEventListener('keyup', function(e){
-            if(e.keyCode===10009 || e.key==='GoBack'){
-                if(isPlayerOpen){
+        // TV geri tuşu (keyup)
+        document.addEventListener('keyup', function(e) {
+            if (e.keyCode === 10009 || e.key === 'GoBack') {
+                if (isPlayerOpen) {
                     e.preventDefault();
                     closePlayer();
                 }
             }
         });
 
-        /* ---- sayfa gizlenince / görününce ---- */
-        document.addEventListener('visibilitychange', ()=>{
-            if(document.hidden){
-                // sayfa arka planda, stall monitor dur? ama devam etsin
+        /* ===== SAYFA GİZLENME ===== */
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                // arka planda stall monitor devam etsin
             } else {
-                if(isPlayerOpen && videoEl.paused && currentState===PlayerState.PLAYING){
-                    // try resume if was playing
-                    videoEl.play().catch(()=>{});
+                if (isPlayerOpen && videoEl.paused && currentState === PlayerState.PLAYING) {
+                    videoEl.play().catch(() => {});
                 }
             }
         });
 
-        /* ===== BAŞLAT ===== */
-        document.addEventListener('DOMContentLoaded', ()=>{
-            initM3U();
-            updateVolumeUI();
-            // pip visibility init
-            if(!document.pictureInPictureEnabled) pipBtn.style.display='none';
+        /* ===== M3U SİSTEMİ ===== */
+        const m3uConfig = {
+            proxyUrl: "https://script.google.com/macros/s/AKfycbzv4yjrPMkMTcZsnMA8dpi9b5mn0ju9OLhtmyR-Xau3k3lhEtfHhWXzCRqz9bxdVB4sUQ/dev",
+            m3uFileUrl: "https://file.garden/aMCMLdwOhlHjDvvq/Belgesel%20(1).m3u"
+        };
+        let allChannels = []; let displayedCount = 0; const loadLimit = 60; let currentList = [];
+
+        async function initM3U() {
+            try {
+                // Kütüphane yüklenene kadar bekle (max 3 sn)
+                const waitLibs = new Promise((resolve) => {
+                    if (isHlsJsAvailable() || isMpegtsJsAvailable() || isNativeHlsSupported()) {
+                        resolve();
+                    } else {
+                        const t = setTimeout(resolve, 3000);
+                        const checkInterval = setInterval(() => {
+                            if (isHlsJsAvailable() || isMpegtsJsAvailable() || isNativeHlsSupported()) {
+                                clearTimeout(t);
+                                clearInterval(checkInterval);
+                                resolve();
+                            }
+                        }, 200);
+                    }
+                });
+                await waitLibs;
+
+                const res = await fetch(`${m3uConfig.proxyUrl}?url=${encodeURIComponent(m3uConfig.m3uFileUrl)}`);
+                if (!res.ok) throw new Error('Proxy HTTP ' + res.status);
+                const text = await res.text();
+                const lines = text.split('\n');
+                let currentItem = null;
+                const categories = new Set();
+
+                lines.forEach(line => {
+                    line = line.trim();
+                    if (line.startsWith('#EXTINF:')) {
+                        const titleMatch = line.match(/,([^,]+)$/);
+                        const logoMatch = line.match(/tvg-logo="([^"]+)"/);
+                        const groupMatch = line.match(/group-title="([^"]+)"/);
+                        currentItem = {
+                            title: (titleMatch ? titleMatch[1].trim() : 'İsimsiz Film'),
+                            image: (logoMatch ? logoMatch[1].trim() : 'https://i.hizliresim.com/91rbev6.png'),
+                            group: (groupMatch ? groupMatch[1].trim() : 'Genel')
+                        };
+                        categories.add(currentItem.group);
+                    } else if (line && !line.startsWith('#') && currentItem) {
+                        currentItem.url = line.trim();
+                        if (currentItem.url) allChannels.push(currentItem);
+                        currentItem = null;
+                    }
+                });
+
+                const chipBox = document.getElementById('m3uCategoriesScroll');
+                chipBox.textContent = '';
+                function createChip(cat, label) {
+                    const el = document.createElement('button');
+                    el.className = 'm3u-category-chip' + (cat === 'all' ? ' active' : '');
+                    el.tabIndex = 0;
+                    el.dataset.category = cat;
+                    el.textContent = label;
+                    el.addEventListener('click', function() {
+                        document.querySelectorAll('.m3u-category-chip').forEach(c => c.classList.remove('active'));
+                        this.classList.add('active');
+                        filterChannelsByCategory(this.dataset.category);
+                    });
+                    return el;
+                }
+                chipBox.appendChild(createChip('all', 'Tüm Filmler'));
+                Array.from(categories).sort((a, b) => a.localeCompare(b, 'tr')).forEach(cat => {
+                    chipBox.appendChild(createChip(cat, cat));
+                });
+
+                filterChannelsByCategory('all');
+            } catch (e) {
+                pWarn('M3U yükleme hatası', e);
+                document.getElementById('channelsContainer').innerHTML = `<div class="loading-placeholder"><i class="fas fa-exclamation-triangle"></i> Veri yüklenemedi. İnternet bağlantınızı kontrol edin.</div>`;
+            }
+        }
+
+        function filterChannelsByCategory(cat) {
+            const term = searchInput.value.trim().toLowerCase();
+            currentList = allChannels.filter(c => {
+                const matchCat = cat === 'all' || c.group === cat;
+                const matchTerm = !term || (c.title + ' ' + c.group).toLowerCase().includes(term);
+                return matchCat && matchTerm;
+            });
+            const titleEl = document.getElementById('mainCategoryTitle');
+            titleEl.textContent = '';
+            const txt = document.createTextNode((cat === 'all' ? 'Tüm Filmler' : cat) + ' ');
+            const countSpan = document.createElement('span');
+            countSpan.className = 'item-count';
+            countSpan.textContent = `(${currentList.length})`;
+            titleEl.appendChild(txt);
+            titleEl.appendChild(countSpan);
+
+            document.getElementById('channelsContainer').textContent = '';
+            displayedCount = 0;
+            if (currentList.length === 0) {
+                document.getElementById('channelsContainer').innerHTML = `<div class="loading-placeholder"><i class="fas fa-search"></i> Sonuç bulunamadı.</div>`;
+                document.getElementById('loadMoreContainer').style.display = 'none';
+                return;
+            }
+            renderMore();
+        }
+
+        function renderMore() {
+            const container = document.getElementById('channelsContainer');
+            const placeholder = container.querySelector('.loading-placeholder');
+            if (placeholder) placeholder.remove();
+
+            const toShow = currentList.slice(displayedCount, displayedCount + loadLimit);
+            toShow.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'cat-card';
+                card.tabIndex = 0;
+                card.setAttribute('role', 'button');
+                card.setAttribute('aria-label', item.title);
+
+                const imgWrap = document.createElement('div');
+                imgWrap.className = 'card-img-wrap';
+                const img = document.createElement('img');
+                img.className = 'card-img';
+                img.loading = 'lazy';
+                img.alt = item.title;
+                img.src = item.image;
+                img.onerror = function() { this.src = 'https://i.hizliresim.com/91rbev6.png'; };
+                const badge = document.createElement('span');
+                badge.className = 'card-badge';
+                badge.textContent = 'CANLI';
+                imgWrap.appendChild(img);
+                imgWrap.appendChild(badge);
+
+                const body = document.createElement('div');
+                body.className = 'card-body';
+                const nameEl = document.createElement('div');
+                nameEl.className = 'card-name';
+                nameEl.textContent = item.title;
+                const subEl = document.createElement('div');
+                subEl.className = 'card-sub';
+                subEl.textContent = item.group;
+                body.appendChild(nameEl);
+                body.appendChild(subEl);
+
+                card.appendChild(imgWrap);
+                card.appendChild(body);
+
+                card.addEventListener('click', () => {
+                    window.currentUrl = item.url;
+                    window.currentName = item.title;
+                    document.getElementById('playerOptionsTitle').textContent = item.title;
+                    lastFocusedElement = card;
+                    document.getElementById('playerOptionsModal').style.display = 'flex';
+                    setTimeout(() => document.getElementById('playInBuiltInPlayer').focus(), 50);
+                });
+                card.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); card.click(); }
+                });
+                container.appendChild(card);
+            });
+            displayedCount += toShow.length;
+            document.getElementById('loadMoreContainer').style.display = displayedCount < currentList.length ? 'block' : 'none';
+        }
+        document.getElementById('loadMoreBtn').addEventListener('click', renderMore);
+
+        /* ===== MODAL KAPAT ===== */
+        document.getElementById('playerOptionsClose').addEventListener('click', () => {
+            document.getElementById('playerOptionsModal').style.display = 'none';
+            if (lastFocusedElement) lastFocusedElement.focus();
+        });
+        document.getElementById('playerOptionsModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                e.currentTarget.style.display = 'none';
+                if (lastFocusedElement) lastFocusedElement.focus();
+            }
         });
 
-        // Ayrıca direkt script yüklenirken de çalışsın (DOMContentLoaded zaten tetiklenebilir)
-        if(document.readyState!=='loading') initM3U();
+        /* ===== DIŞ OYNATICI SEÇENEKLERİ ===== */
+        document.getElementById('playWithExoplayer').addEventListener('click', () => {
+            let url = window.currentUrl;
+            if (!url.includes('.m3u8')) url += (url.includes('?') ? '&' : '?') + 'ext=.m3u8';
+            window.location.href = url;
+            document.getElementById('playerOptionsModal').style.display = 'none';
+            showNotification("ExoPlayer başlatılıyor...", "play-circle");
+        });
+        document.getElementById('playInWuffyPlayer').addEventListener('click', () => {
+            try {
+                const b64 = btoa(unescape(encodeURIComponent(window.currentUrl)));
+                window.location.href = `intent://${b64}#Intent;scheme=xmtv;package=co.wuffy.player;end`;
+            } catch (e) { window.location.href = `intent://${window.currentUrl}#Intent;scheme=http;package=co.wuffy.player;end`; }
+            document.getElementById('playerOptionsModal').style.display = 'none';
+            showNotification("Wuffy Player başlatılıyor...", "rocket");
+        });
+        document.getElementById('playInJustPlayer').addEventListener('click', () => {
+            const noHttp = window.currentUrl.replace(/^https?:\/\//, '');
+            window.location.href = `intent://${noHttp}#Intent;scheme=http;package=com.brouken.player;type=video/*;end`;
+            document.getElementById('playerOptionsModal').style.display = 'none';
+            showNotification("Just Player başlatılıyor...", "film");
+        });
 
-        /* ===== DEBUG expose ===== */
+        /* ===== BAŞLAT ===== */
+        document.addEventListener('DOMContentLoaded', () => {
+            initM3U();
+            updateVolumeUI();
+            if (!document.pictureInPictureEnabled) pipBtn.style.display = 'none';
+        });
+        if (document.readyState !== 'loading') initM3U();
+
+        /* ===== HATA İZLEME VE YARDIMCI FONKSİYONLAR ===== */
+        // Global error yakalama
+        window.addEventListener('error', (e) => {
+            pErr('GLOBAL ERROR:', e.message || e.reason || '', e.filename || '', e.lineno || '');
+            showNotification('Player hatası oluştu — konsola bak', 'exclamation-triangle', 4000);
+        });
+        window.addEventListener('unhandledrejection', (e) => {
+            pErr('UNHANDLED PROMISE REJECTION:', e.reason || '');
+            showNotification('Promise reddedildi — konsola bak', 'exclamation-triangle', 4000);
+        });
+
+        /* ===== DEBUG TERAPİ ===== */
         window._playerDebug = {
-            get state(){ return currentState; },
-            get hls(){ return hlsInstance; },
-            get mpegts(){ return mpegtsInstance; },
-            get video(){ return videoEl; },
-            get attempts(){ return reconnectAttempts; },
-            get variants(){ return streamUrlVariants; },
-            get variantIdx(){ return currentVariantIndex; },
-            formatStreamUrl, isHlsUrl, buildStreamVariants,
-            // Titan test helper: window._playerDebug.testTitan()
-            testTitan: ()=> startPlayback('http://titanplus.xyz/play/live.php?mac=00:1A:79:98:9F:65&stream=913191&extension=ts','TITAN TEST — Galatasaray maçı'),
+            get state() { return currentState; },
+            get hls() { return hlsInstance; },
+            get mpegts() { return mpegtsInstance; },
+            get video() { return videoEl; },
+            get attempts() { return reconnectAttempts; },
+            get variants() { return variants; },
+            get variantIdx() { return currentVariantIndex; },
+            formatStreamUrl: streamDetector.formatHlsUrl,
+            detectType: streamDetector.detectType,
+            buildVariants: streamDetector.buildVariants,
+            testTitan: () => openPlayer('http://titanplus.xyz/play/live.php?mac=00:1A:79:98:9F:65&stream=913191&extension=ts', 'TITAN TEST — Galatasaray maçı'),
         };
     </script>
 </body>
